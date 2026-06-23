@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#4CAF50">
+    <meta name="description" content="Személyes költségvetés-kezelő PWA">
+    <title>Budget Manager</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 16px;
+            padding-bottom: 80px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        header {
+            background: #4CAF50;
+            color: white;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            font-size: 1.5em;
+            font-weight: 600;
+        }
+
+        nav {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        button:hover {
+            background: #45a049;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background: #666;
+        }
+
+        button.danger {
+            background: #f44336;
+        }
+
+        button.small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .balance {
+            font-size: 2em;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .balance.negative {
+            color: #f44336;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: #666;
+            font-size: 14px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+
+        .transaction-list {
+            list-style: none;
+        }
+
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+        }
+
+        .transaction-item:hover {
+            background: #f9f9f9;
+        }
+
+        .transaction-item:last-child {
+            border-bottom: none;
+        }
+
+        .transaction-info {
+            flex: 1;
+        }
+
+        .transaction-amount {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .transaction-amount.expense {
+            color: #f44336;
+        }
+
+        .transaction-amount.income {
+            color: #4CAF50;
+        }
+
+        .transaction-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #eee;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #45a049);
+            transition: width 0.3s;
+        }
+
+        .progress-fill.warning {
+            background: linear-gradient(90deg, #FF9800, #F57C00);
+        }
+
+        .progress-fill.danger {
+            background: linear-gradient(90deg, #f44336, #D32F2F);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .badge.danger {
+            background: #ffebee;
+            color: #f44336;
+        }
+
+        .badge.warning {
+            background: #fff3e0;
+            color: #FF9800;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+
+        .tab {
+            padding: 8px 16px;
+            background: #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .tab.active {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+
+        .prediction-box {
+            background: #fff3e0;
+            border-left: 4px solid #FF9800;
+            padding: 12px;
+            margin: 12px 0;
+            border-radius: 4px;
+        }
+
+        .ocr-preview {
+            max-width: 100%;
+            max-height: 200px;
+            margin: 12px 0;
+            border-radius: 8px;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 8px;
+                padding-bottom: 80px;
+            }
+            
+            nav {
+                gap: 4px;
+            }
+            
+            button {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>💰 Budget Manager</h1>
+        <button onclick="installPWA()" id="installBtn" class="hidden small">📱 Telepítés</button>
+    </header>
+
+    <nav>
+        <button onclick="showView('dashboard')" id="navDashboard">📊 Dashboard</button>
+        <button onclick="showView('transactions')" id="navTransactions">💳 Tranzakciók</button>
+        <button onclick="showView('categories')" id="navCategories">📂 Kategóriák</button>
+        <button onclick="showView('goals')" id="navGoals">🎯 Megtakarítás</button>
+        <button onclick="openOCRModal()" class="secondary">📸 OCR</button>
+    </nav>
+
+    <!-- Dashboard View -->
+    <div id="dashboardView">
+        <div class="card">
+            <h2>Aktuális egyenleg</h2>
+            <div class="balance" id="totalBalance">0 Ft</div>
+            <div id="predictionBox" class="prediction-box hidden"></div>
+        </div>
+
+        <div class="card">
+            <h2>Kategória megoszlás (aktuális hónap)</h2>
+            <div class="chart-container">
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+
+        <button onclick="openTransactionModal()" style="width: 100%; margin-top: 16px; padding: 16px; font-size: 18px;">
+            ➕ Új tranzakció
+        </button>
+    </div>
+
+    <!-- Transactions View -->
+    <div id="transactionsView" class="hidden">
+        <div class="card">
+            <div class="tabs">
+                <div class="tab active" onclick="filterTransactions('all', this)">Összes</div>
+                <div class="tab" onclick="filterTransactions('expense', this)">Kiadások</div>
+                <div class="tab" onclick="filterTransactions('income', this)">Bevételek</div>
+            </div>
+            <ul class="transaction-list" id="transactionList"></ul>
+        </div>
+        <button onclick="openTransactionModal()" style="width: 100%; padding: 16px; font-size: 18px;">
+            ➕ Új tranzakció
+        </button>
+    </div>
+
+    <!-- Categories View -->
+    <div id="categoriesView" class="hidden">
+        <div class="card" id="categoriesList"></div>
+        <button onclick="openCategoryModal()" style="width: 100%; padding: 16px; font-size: 18px;">
+            ➕ Új kategória
+        </button>
+    </div>
+
+    <!-- Goals View -->
+    <div id="goalsView" class="hidden">
+        <div class="card" id="goalsList"></div>
+        <button onclick="openGoalModal()" style="width: 100%; padding: 16px; font-size: 18px;">
+            ➕ Új megtakarítási cél
+        </button>
+    </div>
+
+    <!-- Transaction Modal -->
+    <div id="transactionModal" class="modal">
+        <div class="modal-content">
+            <h2 id="transactionModalTitle">Új tranzakció</h2>
+            <form id="transactionForm" onsubmit="saveTransaction(event)">
+                <input type="hidden" id="transactionId">
+                <div class="form-group">
+                    <label>Összeg (Ft)</label>
+                    <input type="number" id="transactionAmount" required step="0.01" placeholder="Pl. -5000 vagy 100000">
+                </div>
+                <div class="form-group">
+                    <label>Kategória</label>
+                    <select id="transactionCategory" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Dátum</label>
+                    <input type="date" id="transactionDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Megjegyzés</label>
+                    <textarea id="transactionNote" rows="2" placeholder="Opcionális megjegyzés..."></textarea>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button type="submit">💾 Mentés</button>
+                    <button type="button" onclick="closeModal('transactionModal')" class="secondary">Mégse</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Category Modal -->
+    <div id="categoryModal" class="modal">
+        <div class="modal-content">
+            <h2 id="categoryModalTitle">Új kategória</h2>
+            <form id="categoryForm" onsubmit="saveCategory(event)">
+                <input type="hidden" id="categoryId">
+                <div class="form-group">
+                    <label>Név</label>
+                    <input type="text" id="categoryName" required placeholder="Pl. Élelmiszer">
+                </div>
+                <div class="form-group">
+                    <label>Ikon</label>
+                    <input type="text" id="categoryIcon" placeholder="Emoji, pl. 🛒" required>
+                </div>
+                <div class="form-group">
+                    <label>Szín</label>
+                    <input type="color" id="categoryColor" value="#4CAF50">
+                </div>
+                <div class="form-group">
+                    <label>Havi limit (opcionális)</label>
+                    <input type="number" id="categoryLimit" placeholder="Pl. 50000" step="0.01">
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button type="submit">💾 Mentés</button>
+                    <button type="button" onclick="closeModal('categoryModal')" class="secondary">Mégse</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Goal Modal -->
+    <div id="goalModal" class="modal">
+        <div class="modal-content">
+            <h2>Új megtakarítási cél</h2>
+            <form id="goalForm" onsubmit="saveGoal(event)">
+                <div class="form-group">
+                    <label>Cél neve</label>
+                    <input type="text" id="goalName" required placeholder="Pl. Nyárási utazás">
+                </div>
+                <div class="form-group">
+                    <label>Cél összeg (Ft)</label>
+                    <input type="number" id="goalTarget" required step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Jelenlegi összeg (Ft)</label>
+                    <input type="number" id="goalCurrent" required step="0.01" value="0">
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button type="submit">💾 Mentés</button>
+                    <button type="button" onclick="closeModal('goalModal')" class="secondary">Mégse</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- OCR Modal -->
+    <div id="ocrModal" class="modal">
+        <div class="modal-content">
+            <h2>OCR - Tranzakció felismerése</h2>
+            <div class="form-group">
+                <label>Válassz képet (screenshot)</label>
+                <input type="file" id="ocrFile" accept="image/*" onchange="processOCR()">
+            </div>
+            <div id="ocrLoading" class="hidden">⏳ Feldolgozás folyamatban...</div>
+            <img id="ocrPreview" class="ocr-preview hidden">
+            <div id="ocrResult" class="hidden">
+                <p>Felismert szöveg: <span id="ocrText"></span></p>
+                <p>Felismert összeg: <span id="ocrAmount"></span> Ft</p>
+                <button onclick="fillTransactionFromOCR()" class="small">Kitöltés tranzakcióként</button>
+            </div>
+            <button onclick="closeModal('ocrModal')" class="secondary" style="margin-top: 8px;">Bezárás</button>
+        </div>
+    </div>
+
+    <!-- Limit Exceeded Modal -->
+    <div id="limitModal" class="modal">
+        <div class="modal-content">
+            <h2>⚠️ Limit túllépés!</h2>
+            <p id="limitMessage"></p>
+            <p>Szeretnéd a túllépést levonni egy másik kategória maradék limitjéből?</p>
+            <div class="form-group">
+                <label>Válassz kategóriát</label>
+                <select id="limitCategorySelect"></select>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button onclick="handleLimitExceeded()">✅ Igen, vond le</button>
+                <button onclick="closeModal('limitModal')" class="secondary">❌ Mégse</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <script>
+        // Initialize IndexedDB with Dexie
+        const db = new Dexie('BudgetManagerDB');
+        db.version(1).stores({
+            transactions: '++id, amount, categoryId, date, note, source',
+            categories: '++id, name, icon, monthlyLimit, color',
+            savingsGoals: '++id, name, targetAmount, currentAmount, deadline, linkedCategoryIds'
+        });
+
+        // Global state
+        let currentView = 'dashboard';
+        let currentFilter = 'all';
+        let chart = null;
+        let ocrData = null;
+        let pendingLimitTransaction = null;
+
+        // Initialize app
+        async function init() {
+            await seedDefaultCategories();
+            await updateAllViews();
+            registerServiceWorker();
+            setupInstallPrompt();
+        }
+
+        // Seed default categories if empty
+        async function seedDefaultCategories() {
+            const count = await db.categories.count();
+            if (count === 0) {
+                const defaults = [
+                    { name: 'Fizetés', icon: '💰', monthlyLimit: null, color: '#4CAF50' },
+                    { name: 'Élelmiszer', icon: '🛒', monthlyLimit: 80000, color: '#FF9800' },
+                    { name: 'Lakhatás', icon: '🏠', monthlyLimit: 150000, color: '#2196F3' },
+                    { name: 'Szórakozás', icon: '🎮', monthlyLimit: 30000, color: '#9C27B0' },
+                    { name: 'Közlekedés', icon: '🚗', monthlyLimit: 40000, color: '#F44336' },
+                    { name: 'Egyéb', icon: '📌', monthlyLimit: null, color: '#607D8B' }
+                ];
+                await db.categories.bulkAdd(defaults);
+            }
+        }
+
+        // View switching
+        function showView(view) {
+            currentView = view;
+            document.querySelectorAll('[id$="View"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById(view + 'View').classList.remove('hidden');
+            
+            // Update nav buttons
+            document.querySelectorAll('nav button').forEach(btn => btn.style.background = '');
+            document.getElementById('nav' + view.charAt(0).toUpperCase() + view.slice(1)).style.background = '#45a049';
+            
+            updateAllViews();
+        }
+
+        // Update all views
+        async function updateAllViews() {
+            switch(currentView) {
+                case 'dashboard':
+                    await updateDashboard();
+                    break;
+                case 'transactions':
+                    await updateTransactionList();
+                    break;
+                case 'categories':
+                    await updateCategoriesList();
+                    break;
+                case 'goals':
+                    await updateGoalsList();
+                    break;
+            }
+        }
+
+        // Dashboard
+        async function updateDashboard() {
+            const transactions = await db.transactions.toArray();
+            const total = transactions.reduce((sum, t) => sum + t.amount, 0);
+            document.getElementById('totalBalance').textContent = total.toLocaleString('hu-HU') + ' Ft';
+            document.getElementById('totalBalance').className = 'balance' + (total < 0 ? ' negative' : '');
+            
+            await updateChart();
+            await updatePrediction();
+        }
+
+        async function updateChart() {
+            const now = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            const transactions = await db.transactions
+                .filter(t => new Date(t.date) >= monthStart && t.amount < 0)
+                .toArray();
+            
+            const categories = await db.categories.toArray();
+            const categoryMap = {};
+            categories.forEach(c => categoryMap[c.id] = { name: c.name, color: c.color, total: 0 });
+            
+            transactions.forEach(t => {
+                if (categoryMap[t.categoryId]) {
+                    categoryMap[t.categoryId].total += Math.abs(t.amount);
+                }
+            });
+            
+            const data = Object.values(categoryMap).filter(c => c.total > 0);
+            
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            if (chart) chart.destroy();
+            
+            if (data.length === 0) {
+                ctx.canvas.parentElement.innerHTML = '<p style="text-align:center;color:#666;">Nincs adat ebben a hónapban</p>';
+                return;
+            }
+            
+            chart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(d => d.name),
+                    datasets: [{
+                        data: data.map(d => d.total),
+                        backgroundColor: data.map(d => d.color),
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+
+        async function updatePrediction() {
+            const predictionBox = document.getElementById('predictionBox');
+            const now = new Date();
+            const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+            const daysElapsed = now.getDate();
+            
+            if (daysElapsed < 3) {
+                predictionBox.classList.add('hidden');
+                return;
+            }
+            
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            const transactions = await db.transactions
+                .filter(t => new Date(t.date) >= monthStart && t.amount < 0)
+                .toArray();
+            
+            const categories = await db.categories.toArray();
+            const predictions = [];
+            
+            for (const cat of categories) {
+                if (!cat.monthlyLimit) continue;
+                
+                const spent = transactions
+                    .filter(t => t.categoryId === cat.id)
+                    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+                
+                const dailyRate = spent / daysElapsed;
+                const projected = spent + (dailyRate * (daysInMonth - daysElapsed));
+                const diff = projected - cat.monthlyLimit;
+                
+                if (diff > 0) {
+                    predictions.push({ category: cat.name, overshoot: Math.round(diff) });
+                }
+            }
+            
+            if (predictions.length > 0) {
+                predictionBox.classList.remove('hidden');
+                predictionBox.innerHTML = '<strong>📊 Predikció:</strong><br>' +
+                    predictions.map(p => 
+                        `Ha így folytatod, ~${p.overshoot.toLocaleString('hu-HU')} Ft-tal lépheted túl a(z) <strong>${p.category}</strong> limitet hónap végéig.`
+                    ).join('<br>');
+            } else {
+                predictionBox.classList.add('hidden');
+            }
+        }
+
+        // Transactions
+        async function updateTransactionList() {
+            const transactions = await db.transactions.orderBy('date').reverse().toArray();
+            const categories = await db.categories.toArray();
+            const categoryMap = {};
+            categories.forEach(c => categoryMap[c.id] = c);
+            
+            let filtered = transactions;
+            if (currentFilter === 'expense') {
+                filtered = transactions.filter(t => t.amount < 0);
+            } else if (currentFilter === 'income') {
+                filtered = transactions.filter(t => t.amount > 0);
+            }
+            
+            const list = document.getElementById('transactionList');
+            list.innerHTML = filtered.map(t => {
+                const cat = categoryMap[t.categoryId] || { name: 'Ismeretlen', icon: '❓' };
+                const date = new Date(t.date).toLocaleDateString('hu-HU');
+                const amountClass = t.amount >= 0 ? 'income' : 'expense';
+                
+                return `
+                    <li class="transaction-item">
+                        <div class="transaction-info">
+                            <strong>${cat.icon} ${cat.name}</strong>
+                            <small>${date}${t.note ? ' - ' + t.note : ''}</small>
+                            ${t.source === 'ocr' ? '<span class="badge">OCR</span>' : ''}
+                        </div>
+                        <div class="transaction-amount ${amountClass}">
+                            ${t.amount.toLocaleString('hu-HU')} Ft
+                        </div>
+                        <div class="transaction-actions">
+                            <button class="small" onclick="editTransaction(${t.id})">✏️</button>
+                            <button class="small danger" onclick="deleteTransaction(${t.id})">🗑️</button>
+                        </div>
+                    </li>
+                `;
+            }).join('');
+            
+            if (filtered.length === 0) {
+                list.innerHTML = '<li style="text-align:center;color:#666;padding:20px;">Nincs tranzakció</li>';
+            }
+        }
+
+        function filterTransactions(filter, tabElement) {
+            currentFilter = filter;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            tabElement.classList.add('active');
+            updateTransactionList();
+        }
+
+        async function saveTransaction(event) {
+            event.preventDefault();
+            
+            const id = document.getElementById('transactionId').value;
+            const amount = parseFloat(document.getElementById('transactionAmount').value);
+            const categoryId = parseInt(document.getElementById('transactionCategory').value);
+            const date = document.getElementById('transactionDate').value;
+            const note = document.getElementById('transactionNote').value;
+            
+            // Check limit
+            if (amount < 0) {
+                const category = await db.categories.get(categoryId);
+                if (category && category.monthlyLimit) {
+                    const now = new Date(date);
+                    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+                    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                    
+                    const spent = await db.transactions
+                        .filter(t => t.categoryId === categoryId && 
+                                   t.date >= monthStart.toISOString().split('T')[0] &&
+                                   t.date <= monthEnd.toISOString().split('T')[0] &&
+                                   t.amount < 0)
+                        .toArray();
+                    
+                    const totalSpent = spent.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+                    const wouldBeSpent = totalSpent + Math.abs(amount);
+                    
+                    if (wouldBeSpent > category.monthlyLimit) {
+                        pendingLimitTransaction = { id, amount, categoryId, date, note };
+                        document.getElementById('limitMessage').textContent = 
+                            `A(z) ${category.name} kategória limitje ${category.monthlyLimit.toLocaleString('hu-HU')} Ft, de a kiadás után ${wouldBeSpent.toLocaleString('hu-HU')} Ft lenne.`;
+                        
+                        // Populate category select for limit handling
+                        const select = document.getElementById('limitCategorySelect');
+                        const allCategories = await db.categories.toArray();
+                        select.innerHTML = allCategories
+                            .filter(c => c.id !== categoryId && c.monthlyLimit)
+                            .map(c => {
+                                const catSpent = spent.filter(s => s.categoryId === c.id)
+                                    .reduce((sum, s) => sum + Math.abs(s.amount), 0);
+                                const remaining = c.monthlyLimit - catSpent;
+                                return `<option value="${c.id}">${c.icon} ${c.name} (maradék: ${remaining.toLocaleString('hu-HU')} Ft)</option>`;
+                            }).join('');
+                        
+                        document.getElementById('limitModal').classList.add('active');
+                        return;
+                    }
+                }
+            }
+            
+            await saveTransactionToDB({ id, amount, categoryId, date, note });
+        }
+
+        async function saveTransactionToDB(data) {
+            const transaction = {
+                amount: data.amount,
+                categoryId: data.categoryId,
+                date: data.date,
+                note: data.note || '',
+                source: data.source || 'manual'
+            };
+            
+            if (data.id) {
+                await db.transactions.update(data.id, transaction);
+            } else {
+                await db.transactions.add(transaction);
+            }
+            
+            closeModal('transactionModal');
+            await updateAllViews();
+        }
+
+        async function handleLimitExceeded() {
+            const targetCategoryId = parseInt(document.getElementById('limitCategorySelect').value);
+            const transaction = pendingLimitTransaction;
+            
+            await db.transactions.add({
+                amount: transaction.amount,
+                categoryId: targetCategoryId,
+                date: transaction.date,
+                note: `${transaction.note} (átcsoportosítva limit túllépés miatt)`,
+                source: 'manual'
+            });
+            
+            closeModal('limitModal');
+            closeModal('transactionModal');
+            pendingLimitTransaction = null;
+            await updateAllViews();
+        }
+
+        async function editTransaction(id) {
+            const t = await db.transactions.get(id);
+            document.getElementById('transactionId').value = t.id;
+            document.getElementById('transactionAmount').value = t.amount;
+            document.getElementById('transactionDate').value = t.date;
+            document.getElementById('transactionNote').value = t.note || '';
+            document.getElementById('transactionModalTitle').textContent = 'Tranzakció szerkesztése';
+            
+            await populateCategorySelect();
+            document.getElementById('transactionCategory').value = t.categoryId;
+            
+            document.getElementById('transactionModal').classList.add('active');
+        }
+
+        async function deleteTransaction(id) {
+            if (confirm('Biztosan törlöd ezt a tranzakciót?')) {
+                await db.transactions.delete(id);
+                await updateAllViews();
+            }
+        }
+
+        function openTransactionModal() {
+            document.getElementById('transactionId').value = '';
+            document.getElementById('transactionForm').reset();
+            document.getElementById('transactionDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('transactionModalTitle').textContent = 'Új tranzakció';
+            populateCategorySelect();
+            document.getElementById('transactionModal').classList.add('active');
+        }
+
+        async function populateCategorySelect() {
+            const categories = await db.categories.toArray();
+            const select = document.getElementById('transactionCategory');
+            select.innerHTML = categories.map(c => 
+                `<option value="${c.id}">${c.icon} ${c.name}</option>`
+            ).join('');
+        }
+
+        // Categories
+        async function updateCategoriesList() {
+            const categories = await db.categories.toArray();
+            const now = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            
+            const transactions = await db.transactions
+                .filter(t => new Date(t.date) >= monthStart && t.amount < 0)
+                .toArray();
+            
+            const list = document.getElementById('categoriesList');
+            list.innerHTML = categories.map(c => {
+                const spent = transactions
+                    .filter(t => t.categoryId === c.id)
+                    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+                
+                let statusBadge = '';
+                if (c.monthlyLimit) {
+                    const percentage = (spent / c.monthlyLimit) * 100;
+                    if (percentage > 100) {
+                        statusBadge = '<span class="badge danger">Túllépve!</span>';
+                    } else if (percentage > 80) {
+                        statusBadge = '<span class="badge warning">Közel a limit</span>';
+                    }
+                }
+                
+                const progressHtml = c.monthlyLimit ? `
+                    <div class="progress-bar">
+                        <div class="progress-fill ${spent > c.monthlyLimit ? 'danger' : spent > c.monthlyLimit * 0.8 ? 'warning' : ''}" 
+                             style="width: ${Math.min((spent / c.monthlyLimit) * 100, 100)}%"></div>
+                    </div>
+                    <small>${spent.toLocaleString('hu-HU')} / ${c.monthlyLimit.toLocaleString('hu-HU')} Ft</small>
+                ` : '<small>Nincs limit beállítva</small>';
+                
+                return `
+                    <div style="margin-bottom: 16px; padding: 12px; border: 1px solid #eee; border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <strong>${c.icon} ${c.name}</strong>
+                            ${statusBadge}
+                            <div>
+                                <button class="small" onclick="editCategory(${c.id})">✏️</button>
+                                <button class="small danger" onclick="deleteCategory(${c.id})">🗑️</button>
+                            </div>
+                        </div>
+                        ${progressHtml}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function saveCategory(event) {
+            event.preventDefault();
+            
+            const id = document.getElementById('categoryId').value;
+            const category = {
+                name: document.getElementById('categoryName').value,
+                icon: document.getElementById('categoryIcon').value,
+                color: document.getElementById('categoryColor').value,
+                monthlyLimit: document.getElementById('categoryLimit').value ? 
+                    parseFloat(document.getElementById('categoryLimit').value) : null
+            };
+            
+            if (id) {
+                await db.categories.update(parseInt(id), category);
+            } else {
+                await db.categories.add(category);
+            }
+            
+            closeModal('categoryModal');
+            await updateAllViews();
+        }
+
+        async function editCategory(id) {
+            const cat = await db.categories.get(id);
+            document.getElementById('categoryId').value = cat.id;
+            document.getElementById('categoryName').value = cat.name;
+            document.getElementById('categoryIcon').value = cat.icon;
+            document.getElementById('categoryColor').value = cat.color;
+            document.getElementById('categoryLimit').value = cat.monthlyLimit || '';
+            document.getElementById('categoryModalTitle').textContent = 'Kategória szerkesztése';
+            document.getElementById('categoryModal').classList.add('active');
+        }
+
+        async function deleteCategory(id) {
+            const count = await db.categories.count();
+            if (count <= 1) {
+                alert('Legalább egy kategóriának kell lennie!');
+                return;
+            }
+            if (confirm('Biztosan törlöd ezt a kategóriát? A hozzá tartozó tranzakciók is törlődnek!')) {
+                await db.transactions.where('categoryId').equals(id).delete();
+                await db.categories.delete(id);
+                await updateAllViews();
+            }
+        }
+
+        function openCategoryModal() {
+            document.getElementById('categoryId').value = '';
+            document.getElementById('categoryForm').reset();
+            document.getElementById('categoryModalTitle').textContent = 'Új kategória';
+            document.getElementById('categoryModal').classList.add('active');
+        }
+
+        // Goals
+        async function updateGoalsList() {
+            const goals = await db.savingsGoals.toArray();
+            const list = document.getElementById('goalsList');
+            
+            if (goals.length === 0) {
+                list.innerHTML = '<p style="text-align:center;color:#666;">Nincs megtakarítási cél</p>';
+                return;
+            }
+            
+            list.innerHTML = goals.map(g => {
+                const percentage = (g.currentAmount / g.targetAmount) * 100;
+                return `
+                    <div style="margin-bottom: 16px;">
+                        <strong>${g.name}</strong>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${Math.min(percentage, 100)}%"></div>
+                        </div>
+                        <small>${g.currentAmount.toLocaleString('hu-HU')} / ${g.targetAmount.toLocaleString('hu-HU')} Ft (${percentage.toFixed(1)}%)</small>
+                        <button class="small danger" onclick="deleteGoal(${g.id})" style="float: right;">🗑️</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function saveGoal(event) {
+            event.preventDefault();
+            
+            const goal = {
+                name: document.getElementById('goalName').value,
+                targetAmount: parseFloat(document.getElementById('goalTarget').value),
+                currentAmount: parseFloat(document.getElementById('goalCurrent').value),
+                deadline: null,
+                linkedCategoryIds: []
+            };
+            
+            await db.savingsGoals.add(goal);
+            closeModal('goalModal');
+            await updateAllViews();
+        }
+
+        async function deleteGoal(id) {
+            if (confirm('Biztosan törlöd ezt a célt?')) {
+                await db.savingsGoals.delete(id);
+                await updateAllViews();
+            }
+        }
+
+        function openGoalModal() {
+            document.getElementById('goalForm').reset();
+            document.getElementById('goalModal').classList.add('active');
+        }
+
+        // OCR
+        async function processOCR() {
+            const fileInput = document.getElementById('ocrFile');
+            const file = fileInput.files[0];
+            if (!file) return;
+            
+            document.getElementById('ocrLoading').classList.remove('hidden');
+            document.getElementById('ocrResult').classList.add('hidden');
+            
+            // Preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('ocrPreview').src = e.target.result;
+                document.getElementById('ocrPreview').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+            
+            try {
+                const { data: { text } } = await Tesseract.recognize(file, 'eng+deu');
+                
+                // Extract amount with regex
+                const amountMatch = text.match(/(\d+[\s,.]?\d*)\s*(?:Ft|EUR|USD)/i);
+                const amount = amountMatch ? parseFloat(amountMatch[1].replace(',', '.').replace(/\s/g, '')) : 0;
+                
+                // Extract date
+                const dateMatch = text.match(/\d{4}[.-]\d{2}[.-]\d{2}/);
+                const date = dateMatch ? dateMatch[0] : new Date().toISOString().split('T')[0];
+                
+                ocrData = { amount: amount, date: date, note: text.substring(0, 100) };
+                
+                document.getElementById('ocrText').textContent = text.substring(0, 100) + '...';
+                document.getElementById('ocrAmount').textContent = amount.toLocaleString('hu-HU');
+                document.getElementById('ocrResult').classList.remove('hidden');
+            } catch (error) {
+                alert('OCR feldolgozási hiba: ' + error.message);
+            } finally {
+                document.getElementById('ocrLoading').classList.add('hidden');
+            }
+        }
+
+        function fillTransactionFromOCR() {
+            if (!ocrData) return;
+            
+            closeModal('ocrModal');
+            openTransactionModal();
+            
+            document.getElementById('transactionAmount').value = -Math.abs(ocrData.amount);
+            document.getElementById('transactionDate').value = ocrData.date;
+            document.getElementById('transactionNote').value = ocrData.note;
+            document.getElementById('transactionForm').dataset.source = 'ocr';
+        }
+
+        function openOCRModal() {
+            document.getElementById('ocrFile').value = '';
+            document.getElementById('ocrPreview').classList.add('hidden');
+            document.getElementById('ocrResult').classList.add('hidden');
+            document.getElementById('ocrLoading').classList.add('hidden');
+            document.getElementById('ocrModal').classList.add('active');
+        }
+
+        // Modal management
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+            if (modalId === 'transactionModal') {
+                pendingLimitTransaction = null;
+            }
+        }
+
+        // PWA Installation
+        let deferredPrompt;
+        
+        function setupInstallPrompt() {
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                document.getElementById('installBtn').classList.remove('hidden');
+            });
+        }
+
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(() => {
+                    document.getElementById('installBtn').classList.add('hidden');
+                    deferredPrompt = null;
+                });
+            }
+        }
+
+        async function registerServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                try {
+                    await navigator.serviceWorker.register('service-worker.js');
+                    console.log('Service Worker registered');
+                } catch (error) {
+                    console.log('Service Worker registration failed:', error);
+                }
+            }
+        }
+
+        // Initialize
+        init();
+    </script>
+</body>
+</html>
