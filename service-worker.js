@@ -1,63 +1,43 @@
-const CACHE_NAME = 'budget-manager-v2';
-const ASSETS = [
-    '/',
-    '/index.html',
-    '/manifest.json',
-    '/icon-192.png',
-    '/icon-512.png'
-];
-
-// Külső CDN assetek, amiket külön kell cache-elni
-const CDN_ASSETS = [
-    'https://unpkg.com/dexie/dist/dexie.js',
-    'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
-    'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'
-];
+const CACHE_NAME = 'budget-manager-v3';
+const ASSETS = ['/'];
 
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME).then(cache => {
-            // Először a helyi fájlokat cache-eljük
-            return cache.addAll(ASSETS).then(() => {
-                // Majd próbáljuk a CDN asseteket is
-                return Promise.allSettled(
-                    CDN_ASSETS.map(url => 
-                        cache.add(url).catch(err => 
-                            console.warn('Failed to cache CDN asset:', url, err)
-                        )
-                    )
-                );
+            return cache.addAll(ASSETS).catch(err => {
+                console.log('Cache addAll error (nem kritikus):', err);
             });
         })
     );
 });
 
 self.addEventListener('fetch', event => {
+    // Csak http/https kéréseket kezelünk
+    if (!event.request.url.startsWith('http')) {
+        return;
+    }
+    
     event.respondWith(
         caches.match(event.request).then(cachedResponse => {
-            // Ha cache-elve van, használjuk a cache-elt verziót
             if (cachedResponse) {
                 return cachedResponse;
             }
             
-            // Ha nincs cache-elve, próbáljuk letölteni és cache-elni
             return fetch(event.request).then(response => {
                 // Csak sikeres válaszokat cache-elünk
-                if (!response || response.status !== 200 || response.type !== 'basic') {
+                if (!response || response.status !== 200) {
                     return response;
                 }
                 
                 const responseToCache = response.clone();
-                
                 caches.open(CACHE_NAME).then(cache => {
                     cache.put(event.request, responseToCache);
                 });
                 
                 return response;
-            }).catch(error => {
-                // Offline fallback
-                console.warn('Fetch failed, returning offline page:', error);
-                return new Response('Offline - Az alkalmazás nem elérhető', {
+            }).catch(err => {
+                console.log('Fetch error (lehet offline):', err);
+                return new Response('Offline mód - az alkalmazás nem elérhető', {
                     status: 503,
                     statusText: 'Service Unavailable'
                 });
