@@ -1,1009 +1,2036 @@
 <!DOCTYPE html>
 <html lang="hu">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#4A90D9">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Budget Manager</title>
-    <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="/icon-192.png">
-    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <!-- ... CSS változatlan ... -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a73e8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="icon-192.svg">
+  <link rel="manifest" href="manifest.json">
+  <title>Budget Manager</title>
+
+  <!-- CDN függőségek -->
+  <script src="https://unpkg.com/dexie/dist/dexie.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+  <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js" defer></script>
+
+  <style>
+    /* ===== CSS Változók ===== */
+    :root {
+      --color-primary: #1a73e8;
+      --color-primary-dark: #1557b0;
+      --color-danger: #d93025;
+      --color-success: #188038;
+      --color-warning: #f9ab00;
+      --color-bg: #f8f9fa;
+      --color-surface: #ffffff;
+      --color-text: #202124;
+      --color-text-secondary: #5f6368;
+      --color-border: #dadce0;
+      --color-divider: #e8eaed;
+      --color-expense: #d93025;
+      --color-income: #188038;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.12);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.15);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --tab-height: 60px;
+      --header-height: 56px;
+    }
+
+    /* Sötét mód */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --color-bg: #1a1a2e;
+        --color-surface: #252540;
+        --color-text: #e8eaed;
+        --color-text-secondary: #9aa0a6;
+        --color-border: #3c4043;
+        --color-divider: #2d2d3d;
+        --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+        --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
+      }
+    }
+
+    /* ===== Reset & Alap ===== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      font-family: var(--font-family);
+      background: var(--color-bg);
+      color: var(--color-text);
+      -webkit-tap-highlight-color: transparent;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      max-width: 100vw;
+    }
+
+    /* ===== App konténer ===== */
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ===== Fejléc ===== */
+    .app-header {
+      flex-shrink: 0;
+      height: var(--header-height);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--color-primary);
+      color: white;
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      z-index: 10;
+      padding: 0 16px;
+    }
+
+    /* ===== Telepítési banner ===== */
+    #install-banner {
+      display: none;
+      background: #fff3cd;
+      color: #856404;
+      padding: 12px 16px;
+      text-align: center;
+      font-size: 0.9rem;
+      font-weight: 500;
+      border-bottom: 1px solid #ffc107;
+      flex-shrink: 0;
+    }
+    #install-banner.show {
+      display: block;
+    }
+
+    /* ===== Frissítés toast ===== */
+    #update-toast {
+      display: none;
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--color-surface);
+      color: var(--color-text);
+      padding: 12px 20px;
+      border-radius: 24px;
+      box-shadow: var(--shadow-md);
+      z-index: 999;
+      font-size: 0.9rem;
+      font-weight: 500;
+      white-space: nowrap;
+      cursor: pointer;
+      border: 1px solid var(--color-border);
+      animation: slideUp 0.3s ease;
+    }
+    #update-toast.show {
+      display: block;
+    }
+    @keyframes slideUp {
+      from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+      to   { transform: translateX(-50%) translateY(0); opacity: 1; }
+    }
+
+    /* ===== Toast értesítés ===== */
+    #toast {
+      display: none;
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      z-index: 1000;
+      font-size: 0.85rem;
+      font-weight: 500;
+      box-shadow: var(--shadow-md);
+      animation: fadeInOut 2.5s ease forwards;
+    }
+    #toast.show {
+      display: block;
+    }
+    @keyframes fadeInOut {
+      0%   { opacity: 0; transform: translateX(-50%) translateY(10px); }
+      15%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+      75%  { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    /* ===== Fő tartalom ===== */
+    .main-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      padding-bottom: calc(var(--tab-height) + 16px);
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* ===== Képernyők ===== */
+    .screen {
+      display: none;
+    }
+    .screen.active {
+      display: block;
+    }
+
+    /* ===== Alsó tab bar ===== */
+    .tab-bar {
+      flex-shrink: 0;
+      height: var(--tab-height);
+      display: flex;
+      background: var(--color-surface);
+      border-top: 1px solid var(--color-divider);
+      box-shadow: 0 -1px 6px rgba(0,0,0,0.08);
+      z-index: 10;
+    }
+    .tab-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      color: var(--color-text-secondary);
+      font-size: 0.7rem;
+      cursor: pointer;
+      padding: 4px 0;
+      min-height: 44px;
+      transition: color 0.2s;
+      -webkit-tap-highlight-color: transparent;
+      gap: 2px;
+    }
+    .tab-btn.active {
+      color: var(--color-primary);
+    }
+    .tab-btn .tab-icon {
+      font-size: 1.4rem;
+      line-height: 1;
+    }
+
+    /* ===== Kártya stílus ===== */
+    .card {
+      background: var(--color-surface);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--color-border);
+    }
+    .card-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    /* ===== Gombok ===== */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-height: 44px;
+      min-width: 44px;
+      padding: 10px 20px;
+      border-radius: 24px;
+      border: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: var(--font-family);
+      transition: all 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: var(--color-primary);
+      color: white;
+    }
+    .btn-primary:active {
+      background: var(--color-primary-dark);
+      transform: scale(0.97);
+    }
+    .btn-danger {
+      background: var(--color-danger);
+      color: white;
+    }
+    .btn-outline {
+      background: transparent;
+      border: 2px solid var(--color-primary);
+      color: var(--color-primary);
+    }
+    .btn-sm {
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      min-height: 36px;
+    }
+    .btn-icon {
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border-radius: 50%;
+      font-size: 1.2rem;
+    }
+    .btn-block {
+      width: 100%;
+    }
+
+    /* ===== Űrlap elemek ===== */
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .form-input, .form-select {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 14px;
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      font-size: 1rem;
+      font-family: var(--font-family);
+      background: var(--color-surface);
+      color: var(--color-text);
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+    .form-input:focus, .form-select:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+    .form-select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='%235f6368'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+    }
+
+    /* Pénznem-szimbólum wrapper */
+    .currency-input-wrapper {
+      display: flex;
+      align-items: stretch;
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      transition: border-color 0.2s;
+      background: var(--color-surface);
+    }
+    .currency-input-wrapper:focus-within {
+      border-color: var(--color-primary);
+    }
+    .currency-symbol {
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--color-text-secondary);
+      background: var(--color-divider);
+      white-space: nowrap;
+      min-width: 44px;
+      justify-content: center;
+      user-select: none;
+    }
+    .currency-symbol.prefix {
+      border-right: 1px solid var(--color-border);
+    }
+    .currency-symbol.suffix {
+      border-left: 1px solid var(--color-border);
+    }
+    .currency-input-wrapper input {
+      flex: 1;
+      border: none;
+      padding: 10px 14px;
+      font-size: 1rem;
+      font-family: var(--font-family);
+      background: transparent;
+      color: var(--color-text);
+      min-height: 44px;
+      min-width: 0;
+    }
+    .currency-input-wrapper input:focus {
+      outline: none;
+    }
+
+    /* ===== Dashboard kártyák ===== */
+    .balance-card {
+      text-align: center;
+      padding: 20px;
+    }
+    .balance-amount {
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .balance-amount.positive { color: var(--color-income); }
+    .balance-amount.negative { color: var(--color-expense); }
+
+    .chart-container {
+      position: relative;
+      width: 100%;
+      max-width: 280px;
+      margin: 0 auto;
+    }
+
+    /* ===== Kategória lista ===== */
+    .category-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--color-divider);
+      min-height: 44px;
+    }
+    .category-item:last-child {
+      border-bottom: none;
+    }
+    .category-icon {
+      font-size: 1.6rem;
+      width: 40px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .category-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .category-name {
+      font-weight: 500;
+      font-size: 0.95rem;
+    }
+    .category-meta {
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+    }
+    .category-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    /* Limit túllépés badge */
+    .limit-exceeded {
+      color: var(--color-danger);
+      font-weight: 700;
+    }
+    .limit-bar {
+      height: 6px;
+      border-radius: 3px;
+      background: var(--color-divider);
+      margin-top: 4px;
+      overflow: hidden;
+    }
+    .limit-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s;
+    }
+    .limit-bar-fill.safe { background: var(--color-success); }
+    .limit-bar-fill.warning { background: var(--color-warning); }
+    .limit-bar-fill.danger { background: var(--color-danger); }
+
+    /* ===== Progress bar ===== */
+    .progress-bar {
+      height: 14px;
+      border-radius: 7px;
+      background: var(--color-divider);
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 7px;
+      background: var(--color-primary);
+      transition: width 0.4s ease;
+    }
+
+    /* ===== Tranzakció lista ===== */
+    .transaction-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--color-divider);
+      min-height: 44px;
+    }
+    .transaction-icon {
+      font-size: 1.5rem;
+      width: 36px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .transaction-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .transaction-name {
+      font-weight: 500;
+    }
+    .transaction-meta {
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+    }
+    .transaction-amount {
+      font-weight: 600;
+      font-size: 1rem;
+      white-space: nowrap;
+    }
+    .transaction-amount.expense { color: var(--color-expense); }
+    .transaction-amount.income { color: var(--color-income); }
+
+    /* ===== Szekció fejlécek ===== */
+    .section-header {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-secondary);
+      padding: 10px 0 6px;
+      margin-top: 8px;
+    }
+
+    /* ===== Pénznem választó ===== */
+    .currency-choice-btn {
+      display: block;
+      width: 100%;
+      padding: 16px;
+      margin-bottom: 10px;
+      background: var(--color-surface);
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius);
+      font-size: 1.2rem;
+      font-weight: 600;
+      cursor: pointer;
+      min-height: 56px;
+      text-align: center;
+      color: var(--color-text);
+      font-family: var(--font-family);
+      transition: all 0.15s;
+    }
+    .currency-choice-btn:active {
+      border-color: var(--color-primary);
+      background: #e8f0fe;
+    }
+
+    /* ===== Segéd ===== */
+    .text-center { text-align: center; }
+    .mt-2 { margin-top: 8px; }
+    .mt-3 { margin-top: 16px; }
+    .mb-2 { margin-bottom: 8px; }
+    .mb-3 { margin-bottom: 16px; }
+    .flex-row { display: flex; gap: 8px; align-items: center; }
+    .flex-between { display: flex; justify-content: space-between; align-items: center; }
+    .text-danger { color: var(--color-danger); }
+    .text-muted { color: var(--color-text-secondary); font-size: 0.85rem; }
+
+    /* Görgethető terület az OCR formban */
+    .ocr-preview {
+      max-height: 200px;
+      overflow-y: auto;
+      background: #f1f3f4;
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      font-size: 0.8rem;
+      font-family: monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #333;
+    }
+  </style>
 </head>
 <body>
-    <!-- ... HTML változatlan ... -->
+  <div id="app">
+    <!-- Fejléc -->
+    <header class="app-header" id="appHeader">💰 Budget Manager</header>
 
-    <script>
-        // Javított adatbázis inicializálás
-        const db = new Dexie('BudgetManagerDB');
-        
-        // Verzió kezelés és séma
-        db.version(1).stores({
-            transactions: '++id, amount, categoryId, date, note, source, currency',
-            categories: '++id, name, icon, monthlyLimit, color',
-            savingsGoals: '++id, name, targetAmount, currentAmount, deadline, linkedCategoryIds',
-            settings: 'key'
+    <!-- Telepítési banner -->
+    <div id="install-banner">📲 Telepítsd az appot a legjobb élményért</div>
+
+    <!-- Fő tartalom -->
+    <main class="main-content" id="mainContent">
+      <!-- Pénznem választó képernyő -->
+      <div id="screen-currency" class="screen active">
+        <div class="card" style="margin-top: 20px;">
+          <h2 style="text-align:center; margin-bottom: 20px;">Válassz pénznemet</h2>
+          <p class="text-muted text-center mb-3">Később a beállításokban módosíthatod</p>
+          <button class="currency-choice-btn" data-currency="HUF">🇭🇺 HUF — Ft</button>
+          <button class="currency-choice-btn" data-currency="EUR">🇪🇺 EUR — €</button>
+          <button class="currency-choice-btn" data-currency="USD">🇺🇸 USD — $</button>
+        </div>
+      </div>
+
+      <!-- Dashboard -->
+      <div id="screen-dashboard" class="screen">
+        <div class="card balance-card">
+          <div class="card-title">Havi egyenleg</div>
+          <div class="balance-amount" id="balanceAmount">0</div>
+          <div style="display:flex; gap:10px; justify-content:center; margin-top:8px; font-size:0.85rem;">
+            <span style="color:var(--color-income);">💰 Bevétel: <strong id="totalIncome">0</strong></span>
+            <span style="color:var(--color-expense);">💸 Kiadás: <strong id="totalExpense">0</strong></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Kiadás kategóriánként</div>
+          <div class="chart-container">
+            <canvas id="expenseChart" width="280" height="280"></canvas>
+          </div>
+          <p class="text-muted text-center mt-2" id="noChartData" style="display:none;">Nincs még kiadási adat ebben a hónapban.</p>
+        </div>
+
+        <div class="card" id="predictionCard">
+          <div class="card-title">📊 Predikció</div>
+          <p id="predictionText" class="text-muted">Számítás folyamatban...</p>
+        </div>
+
+        <button class="btn btn-primary btn-block mt-2" id="quickAddBtn">+ Új tranzakció</button>
+      </div>
+
+      <!-- Tranzakciók -->
+      <div id="screen-transactions" class="screen">
+        <div class="flex-between mb-3">
+          <h2 style="font-size:1.1rem;">Tranzakciók</h2>
+          <button class="btn btn-primary btn-sm" id="openTransactionForm">+ Új</button>
+        </div>
+        <!-- Tranzakció form (rejtett alapból) -->
+        <div class="card" id="transactionFormCard" style="display:none;">
+          <h3 style="margin-bottom:12px;" id="transactionFormTitle">Új tranzakció</h3>
+          <form id="transactionForm">
+            <input type="hidden" id="txEditId">
+            <div class="form-group">
+              <label class="form-label">Típus</label>
+              <select class="form-select" id="txType">
+                <option value="expense">💸 Kiadás</option>
+                <option value="income">💰 Bevétel</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Összeg</label>
+              <div class="currency-input-wrapper" id="txAmountWrapper">
+                <span class="currency-symbol prefix" id="txCurrencyPrefix" style="display:none;"></span>
+                <input type="number" class="form-input" id="txAmount" placeholder="Összeg" step="0.01" min="0" required style="border:none;">
+                <span class="currency-symbol suffix" id="txCurrencySuffix" style="display:none;"></span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Kategória</label>
+              <select class="form-select" id="txCategory" required></select>
+              <p class="text-muted" id="txNoCategoryMsg" style="display:none;">Nincs ilyen típusú kategória — hozz létre egyet a Kategóriák képernyőn</p>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Dátum</label>
+              <input type="date" class="form-input" id="txDate" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Megjegyzés</label>
+              <input type="text" class="form-input" id="txNote" placeholder="Opcionális">
+            </div>
+            <div class="flex-row" style="gap:8px;">
+              <button type="submit" class="btn btn-primary" style="flex:1;">Mentés</button>
+              <button type="button" class="btn btn-outline" id="cancelTransactionForm" style="flex:1;">Mégse</button>
+            </div>
+          </form>
+        </div>
+        <!-- Tranzakció lista -->
+        <div id="transactionList"></div>
+      </div>
+
+      <!-- Kategóriák -->
+      <div id="screen-categories" class="screen">
+        <div class="flex-between mb-3">
+          <h2 style="font-size:1.1rem;">Kategóriák</h2>
+          <button class="btn btn-primary btn-sm" id="openCategoryForm">+ Új</button>
+        </div>
+        <!-- Kategória form -->
+        <div class="card" id="categoryFormCard" style="display:none;">
+          <h3 style="margin-bottom:12px;" id="categoryFormTitle">Új kategória</h3>
+          <form id="categoryForm">
+            <input type="hidden" id="catEditId">
+            <div class="form-group">
+              <label class="form-label">Név</label>
+              <input type="text" class="form-input" id="catName" required placeholder="Pl. Étkezés">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Emoji</label>
+              <input type="text" class="form-input" id="catIcon" placeholder="🍕" maxlength="4">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Típus</label>
+              <select class="form-select" id="catType">
+                <option value="expense">💸 Kiadás</option>
+                <option value="income">💰 Bevétel</option>
+                <option value="both">↕️ Mindkettő</option>
+              </select>
+            </div>
+            <div class="form-group" id="catLimitGroup">
+              <label class="form-label">Havi limit (opcionális)</label>
+              <div class="currency-input-wrapper" id="catLimitWrapper">
+                <span class="currency-symbol prefix" id="catLimitPrefix" style="display:none;"></span>
+                <input type="number" class="form-input" id="catLimit" placeholder="Pl. 50000" step="0.01" min="0" style="border:none;">
+                <span class="currency-symbol suffix" id="catLimitSuffix" style="display:none;"></span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Szín</label>
+              <input type="color" class="form-input" id="catColor" value="#1a73e8" style="height:44px;padding:4px;">
+            </div>
+            <div class="flex-row" style="gap:8px;">
+              <button type="submit" class="btn btn-primary" style="flex:1;">Mentés</button>
+              <button type="button" class="btn btn-outline" id="cancelCategoryForm" style="flex:1;">Mégse</button>
+            </div>
+          </form>
+        </div>
+        <!-- Kategória lista -->
+        <div id="categoryList"></div>
+      </div>
+
+      <!-- Megtakarítási cél -->
+      <div id="screen-savings" class="screen">
+        <h2 style="font-size:1.1rem; margin-bottom:12px;">🎯 Megtakarítási cél</h2>
+        <div class="card" id="savingsCard">
+          <div id="savingsInfo">
+            <p class="text-muted text-center">Még nincs beállított megtakarítási cél.</p>
+          </div>
+          <div id="savingsDetails" style="display:none;">
+            <div class="flex-between">
+              <span class="card-title" id="savingsName">Cél</span>
+              <span class="text-muted" id="savingsDeadline"></span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="savingsProgress" style="width:0%;"></div>
+            </div>
+            <div class="flex-between mt-2">
+              <span id="savingsCurrent">0</span>
+              <span id="savingsTarget">0</span>
+            </div>
+            <button class="btn btn-primary btn-sm mt-3" id="addToSavingsBtn">💰 Hozzáadás a célhoz</button>
+          </div>
+        </div>
+        <!-- Megtakarítás form -->
+        <div class="card" id="savingsFormCard" style="display:none;">
+          <h3 id="savingsFormTitle">Cél beállítása</h3>
+          <form id="savingsForm">
+            <div class="form-group">
+              <label class="form-label">Cél neve</label>
+              <input type="text" class="form-input" id="svName" required placeholder="Pl. Nyári utazás">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Célösszeg</label>
+              <div class="currency-input-wrapper" id="svTargetWrapper">
+                <span class="currency-symbol prefix" id="svTargetPrefix" style="display:none;"></span>
+                <input type="number" class="form-input" id="svTargetAmount" required placeholder="Célösszeg" step="0.01" min="0" style="border:none;">
+                <span class="currency-symbol suffix" id="svTargetSuffix" style="display:none;"></span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Jelenlegi összeg</label>
+              <div class="currency-input-wrapper" id="svCurrentWrapper">
+                <span class="currency-symbol prefix" id="svCurrentPrefix" style="display:none;"></span>
+                <input type="number" class="form-input" id="svCurrentAmount" required placeholder="Jelenlegi összeg" step="0.01" min="0" style="border:none;">
+                <span class="currency-symbol suffix" id="svCurrentSuffix" style="display:none;"></span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Határidő (opcionális)</label>
+              <input type="date" class="form-input" id="svDeadline">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Mentés</button>
+          </form>
+        </div>
+        <button class="btn btn-outline btn-block mt-2" id="editSavingsBtn">✏️ Cél szerkesztése</button>
+
+        <!-- Hozzáadás a célhoz form -->
+        <div class="card" id="addToSavingsFormCard" style="display:none;">
+          <h3>Hozzáadás a célhoz</h3>
+          <form id="addToSavingsForm">
+            <div class="form-group">
+              <label class="form-label">Összeg</label>
+              <div class="currency-input-wrapper" id="addSvAmountWrapper">
+                <span class="currency-symbol prefix" id="addSvPrefix" style="display:none;"></span>
+                <input type="number" class="form-input" id="addSvAmount" required placeholder="Összeg" step="0.01" min="0.01" style="border:none;">
+                <span class="currency-symbol suffix" id="addSvSuffix" style="display:none;"></span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Kategória (opcionális, kiadásként rögzítjük)</label>
+              <select class="form-select" id="addSvCategory">
+                <option value="">— Nincs kategória —</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Hozzáadás</button>
+            <button type="button" class="btn btn-outline btn-block mt-2" id="cancelAddToSavings">Mégse</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- OCR -->
+      <div id="screen-ocr" class="screen">
+        <h2 style="font-size:1.1rem; margin-bottom:12px;">📷 OCR — Számla beolvasás</h2>
+        <div class="card">
+          <p class="text-muted mb-3">Tölts fel egy képet banki vagy wallet screenshotról, és az app megpróbálja kiolvasni az összeget és a dátumot.</p>
+          <input type="file" id="ocrFileInput" accept="image/*" capture="environment" style="display:none;">
+          <button class="btn btn-primary btn-block" id="ocrSelectImage">📷 Kép kiválasztása</button>
+          <div id="ocrStatus" class="text-muted text-center mt-3" style="display:none;"></div>
+          <div id="ocrResult" style="display:none;">
+            <h4 class="mt-3">Felismert adatok (ellenőrizd!)</h4>
+            <form id="ocrConfirmForm">
+              <div class="form-group">
+                <label class="form-label">Összeg</label>
+                <div class="currency-input-wrapper" id="ocrAmountWrapper">
+                  <span class="currency-symbol prefix" id="ocrPrefix" style="display:none;"></span>
+                  <input type="number" class="form-input" id="ocrAmount" step="0.01" style="border:none;">
+                  <span class="currency-symbol suffix" id="ocrSuffix" style="display:none;"></span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Dátum</label>
+                <input type="date" class="form-input" id="ocrDate">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Típus</label>
+                <select class="form-select" id="ocrType">
+                  <option value="expense">💸 Kiadás</option>
+                  <option value="income">💰 Bevétel</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Kategória</label>
+                <select class="form-select" id="ocrCategory"></select>
+                <p class="text-muted" id="ocrNoCategoryMsg" style="display:none;">Nincs ilyen típusú kategória — hozz létre egyet a Kategóriák képernyőn</p>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Megjegyzés</label>
+                <input type="text" class="form-input" id="ocrNote" placeholder="OCR-ből felismerve">
+              </div>
+              <button type="submit" class="btn btn-primary btn-block">✅ Mentés</button>
+            </form>
+            <details class="mt-3">
+              <summary style="cursor:pointer;color:var(--color-text-secondary);">Nyers OCR szöveg</summary>
+              <div class="ocr-preview mt-2" id="ocrRawText"></div>
+            </details>
+          </div>
+          <p class="text-muted text-center mt-3" id="ocrNoResult" style="display:none;">Nem sikerült automatikusan felismerni, kérlek töltsd ki manuálisan.</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Frissítés toast -->
+    <div id="update-toast">🔄 Frissítés elérhető — <strong>Újratöltés</strong></div>
+
+    <!-- Általános toast -->
+    <div id="toast"></div>
+
+    <!-- Alsó tab bar -->
+    <nav class="tab-bar">
+      <button class="tab-btn active" data-screen="dashboard">
+        <span class="tab-icon">📊</span> Dashboard
+      </button>
+      <button class="tab-btn" data-screen="transactions">
+        <span class="tab-icon">💳</span> Tranzakciók
+      </button>
+      <button class="tab-btn" data-screen="categories">
+        <span class="tab-icon">📁</span> Kategóriák
+      </button>
+      <button class="tab-btn" data-screen="savings">
+        <span class="tab-icon">🎯</span> Célok
+      </button>
+      <button class="tab-btn" data-screen="ocr">
+        <span class="tab-icon">📷</span> OCR
+      </button>
+    </nav>
+  </div>
+
+  <script>
+    // ============================================================
+    // BUDGET MANAGER PWA — Teljes JavaScript
+    // ============================================================
+
+    // Várakozás a CDN scriptek betöltésére
+    function waitForDependencies() {
+      return new Promise(resolve => {
+        const check = () => {
+          if (typeof Dexie !== 'undefined' && typeof Chart !== 'undefined') {
+            resolve();
+          } else {
+            setTimeout(check, 50);
+          }
+        };
+        check();
+      });
+    }
+
+    // ===== Globális állapot =====
+    let currentCurrency = null; // 'HUF' | 'EUR' | 'USD'
+    let currentScreen = 'dashboard';
+    let chartInstance = null;
+    let pendingInstallPrompt = null;
+    let newWorkerWaiting = null;
+
+    // ===== IndexedDB (Dexie) =====
+    let db;
+    function initDB() {
+      db = new Dexie('BudgetManagerDB');
+      db.version(1).stores({
+        transactions: '++id, categoryId, date, type, currency',
+        categories: '++id, type',
+        savingsGoals: '++id',
+        settings: '&key'
+      });
+      return db.open();
+    }
+
+    // ===== Pénznem segédfüggvények =====
+    function getCurrencySymbol(currency) {
+      const c = currency || currentCurrency || 'HUF';
+      if (c === 'HUF') return 'Ft';
+      if (c === 'EUR') return '€';
+      if (c === 'USD') return '$';
+      return 'Ft';
+    }
+
+    function isSymbolPrefix(currency) {
+      const c = currency || currentCurrency || 'HUF';
+      return c === 'EUR' || c === 'USD';
+    }
+
+    function formatAmount(amount, currency) {
+      const c = currency || currentCurrency || 'HUF';
+      if (amount === null || amount === undefined || isNaN(amount)) return '—';
+      const num = Number(amount);
+      if (c === 'HUF') {
+        // 1 234 567 Ft — szimbólum után, szóközzel
+        return Math.round(num).toLocaleString('hu-HU') + ' Ft';
+      } else if (c === 'EUR') {
+        // € 1.234,56 — szimbólum előtt, szóközzel
+        return '€ ' + num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      } else if (c === 'USD') {
+        // $1,234.56 — szimbólum előtt, szóköz nélkül
+        return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      return String(num);
+    }
+
+    function formatAmountCompact(amount, currency) {
+      const c = currency || currentCurrency || 'HUF';
+      if (amount === null || amount === undefined || isNaN(amount)) return '—';
+      const num = Number(amount);
+      if (c === 'HUF') {
+        if (Math.abs(num) >= 1000000) return (num / 1000000).toFixed(1) + 'M Ft';
+        if (Math.abs(num) >= 1000) return Math.round(num / 1000) + 'e Ft';
+        return Math.round(num) + ' Ft';
+      } else {
+        const sym = c === 'EUR' ? '€' : '$';
+        if (Math.abs(num) >= 1000000) return sym + (num / 1000000).toFixed(1) + 'M';
+        if (Math.abs(num) >= 1000) return sym + Math.round(num / 1000) + 'e';
+        return sym + num.toFixed(c === 'EUR' ? 2 : 2);
+      }
+    }
+
+    // Pénznem-szimbólum wrapper-ek frissítése
+    function updateCurrencyWrappers() {
+      const prefixEls = document.querySelectorAll('.currency-symbol.prefix');
+      const suffixEls = document.querySelectorAll('.currency-symbol.suffix');
+      const sym = getCurrencySymbol();
+      const isPrefix = isSymbolPrefix();
+
+      prefixEls.forEach(el => {
+        if (isPrefix) {
+          el.textContent = sym;
+          el.style.display = 'flex';
+        } else {
+          el.style.display = 'none';
+        }
+      });
+
+      suffixEls.forEach(el => {
+        if (!isPrefix) {
+          el.textContent = sym;
+          el.style.display = 'flex';
+        } else {
+          el.style.display = 'none';
+        }
+      });
+    }
+
+    // ===== Toast =====
+    let toastTimeout;
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2500);
+    }
+
+    // ===== Képernyőváltás =====
+    function switchScreen(screenName) {
+      // Elrejt minden képernyőt
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      // Megjeleníti a kért képernyőt
+      const screenEl = document.getElementById('screen-' + screenName);
+      if (screenEl) screenEl.classList.add('active');
+
+      // Tab bar frissítése
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.screen === screenName);
+      });
+
+      // Fejléc frissítése
+      const headerTitles = {
+        dashboard: '💰 Budget Manager',
+        transactions: '💳 Tranzakciók',
+        categories: '📁 Kategóriák',
+        savings: '🎯 Megtakarítás',
+        ocr: '📷 OCR Beolvasás'
+      };
+      document.getElementById('appHeader').textContent = headerTitles[screenName] || 'Budget Manager';
+
+      currentScreen = screenName;
+
+      // Képernyő-specifikus frissítések
+      if (screenName === 'dashboard') refreshDashboard();
+      if (screenName === 'transactions') refreshTransactionList();
+      if (screenName === 'categories') refreshCategoryList();
+      if (screenName === 'savings') refreshSavingsScreen();
+      if (screenName === 'ocr') setupOCRScreen();
+    }
+
+    // ===== Pénznem választás =====
+    async function selectCurrency(currency) {
+      currentCurrency = currency;
+      await db.settings.put({ key: 'currency', value: currency });
+      document.getElementById('screen-currency').classList.remove('active');
+      updateCurrencyWrappers();
+      switchScreen('dashboard');
+      showToast('Pénznem beállítva: ' + currency);
+    }
+
+    // ===== Seed kategóriák =====
+    async function seedCategories() {
+      const count = await db.categories.count();
+      if (count > 0) return;
+
+      const seedData = [
+        // Kiadás kategóriák
+        { name: 'Étkezés', icon: '🍕', type: 'expense', monthlyLimit: 80000, color: '#e74c3c' },
+        { name: 'Közlekedés', icon: '🚗', type: 'expense', monthlyLimit: 30000, color: '#f39c12' },
+        { name: 'Bevásárlás', icon: '🛒', type: 'expense', monthlyLimit: 60000, color: '#e67e22' },
+        { name: 'Lakhatás', icon: '🏠', type: 'expense', monthlyLimit: null, color: '#8e44ad' },
+        { name: 'Szórakozás', icon: '🎬', type: 'expense', monthlyLimit: 25000, color: '#3498db' },
+        { name: 'Egészség', icon: '💊', type: 'expense', monthlyLimit: 20000, color: '#2ecc71' },
+        // Bevétel kategóriák
+        { name: 'Fizetés', icon: '💼', type: 'income', monthlyLimit: null, color: '#27ae60' },
+        { name: 'Szabadúszó munka', icon: '💻', type: 'income', monthlyLimit: null, color: '#2980b9' },
+        { name: 'Ajándék / Egyéb bevétel', icon: '🎁', type: 'income', monthlyLimit: null, color: '#16a085' },
+      ];
+
+      await db.categories.bulkAdd(seedData);
+      console.log('Seed kategóriák létrehozva.');
+    }
+
+    // ===== Kategória lista frissítése =====
+    async function refreshCategoryList() {
+      const container = document.getElementById('categoryList');
+      const categories = await db.categories.toArray();
+
+      const expenseCats = categories.filter(c => c.type === 'expense' || c.type === 'both');
+      const incomeCats = categories.filter(c => c.type === 'income' || c.type === 'both');
+
+      let html = '';
+
+      if (expenseCats.length > 0) {
+        html += '<div class="section-header">💸 Kiadási kategóriák</div>';
+        for (const cat of expenseCats) {
+          html += renderCategoryItem(cat);
+        }
+      }
+
+      if (incomeCats.length > 0) {
+        html += '<div class="section-header">💰 Bevételi kategóriák</div>';
+        for (const cat of incomeCats) {
+          // Ne duplikáljuk a both kategóriákat
+          if (cat.type === 'both' && expenseCats.includes(cat)) continue;
+          html += renderCategoryItem(cat);
+        }
+        // Ha vannak both kategóriák, amik már megjelentek fent
+        const bothCats = incomeCats.filter(c => c.type === 'both');
+        if (bothCats.length > 0 && expenseCats.some(c => c.type === 'both')) {
+          // már megjelentek, ne duplikáljuk
+        }
+      }
+
+      if (categories.length === 0) {
+        html = '<p class="text-muted text-center mt-3">Még nincsenek kategóriák.</p>';
+      }
+
+      container.innerHTML = html;
+
+      // Eseménykezelők a kategória gombokhoz
+      container.querySelectorAll('.cat-edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => editCategory(Number(btn.dataset.id)));
+      });
+      container.querySelectorAll('.cat-delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => deleteCategory(Number(btn.dataset.id)));
+      });
+    }
+
+    function renderCategoryItem(cat) {
+      const limitText = (cat.type !== 'income' && cat.monthlyLimit)
+        ? ` | Limit: ${formatAmountCompact(cat.monthlyLimit)}`
+        : '';
+      const typeBadge = cat.type === 'expense' ? '💸' : cat.type === 'income' ? '💰' : '↕️';
+      return `
+        <div class="category-item">
+          <span class="category-icon">${cat.icon || '📌'}</span>
+          <div class="category-info">
+            <div class="category-name">${escapeHTML(cat.name)} ${typeBadge}</div>
+            <div class="category-meta">${cat.color ? '●' : ''} ${limitText}</div>
+          </div>
+          <div class="category-actions">
+            <button class="btn btn-outline btn-sm btn-icon cat-edit-btn" data-id="${cat.id}" title="Szerkesztés">✏️</button>
+            <button class="btn btn-danger btn-sm btn-icon cat-delete-btn" data-id="${cat.id}" title="Törlés">🗑️</button>
+          </div>
+        </div>`;
+    }
+
+    // ===== Kategória CRUD =====
+    function openNewCategoryForm() {
+      document.getElementById('catEditId').value = '';
+      document.getElementById('catName').value = '';
+      document.getElementById('catIcon').value = '';
+      document.getElementById('catType').value = 'expense';
+      document.getElementById('catLimit').value = '';
+      document.getElementById('catColor').value = '#1a73e8';
+      document.getElementById('categoryFormTitle').textContent = 'Új kategória';
+      document.getElementById('categoryFormCard').style.display = 'block';
+      handleCatTypeChange();
+      updateCurrencyWrappers();
+    }
+
+    async function editCategory(id) {
+      const cat = await db.categories.get(id);
+      if (!cat) return;
+      document.getElementById('catEditId').value = cat.id;
+      document.getElementById('catName').value = cat.name;
+      document.getElementById('catIcon').value = cat.icon || '';
+      document.getElementById('catType').value = cat.type;
+      document.getElementById('catLimit').value = cat.monthlyLimit || '';
+      document.getElementById('catColor').value = cat.color || '#1a73e8';
+      document.getElementById('categoryFormTitle').textContent = 'Kategória szerkesztése';
+      document.getElementById('categoryFormCard').style.display = 'block';
+      handleCatTypeChange();
+      updateCurrencyWrappers();
+    }
+
+    async function deleteCategory(id) {
+      // Ellenőrizzük, van-e tranzakció ezzel a kategóriával
+      const txCount = await db.transactions.where('categoryId').equals(id).count();
+      if (txCount > 0) {
+        if (!confirm(`Ehhez a kategóriához ${txCount} tranzakció tartozik. Biztosan törlöd? A tranzakciók kategória nélkül maradnak.`)) return;
+      } else {
+        if (!confirm('Biztosan törlöd ezt a kategóriát?')) return;
+      }
+      await db.categories.delete(id);
+      // Frissítjük a tranzakciókat, amik ehhez a kategóriához tartoztak
+      await db.transactions.where('categoryId').equals(id).modify({ categoryId: null });
+      showToast('Kategória törölve.');
+      refreshCategoryList();
+    }
+
+    function handleCatTypeChange() {
+      const type = document.getElementById('catType').value;
+      const limitGroup = document.getElementById('catLimitGroup');
+      if (type === 'income') {
+        limitGroup.style.display = 'none';
+        document.getElementById('catLimit').value = '';
+      } else {
+        limitGroup.style.display = 'block';
+      }
+    }
+
+    document.getElementById('catType').addEventListener('change', handleCatTypeChange);
+
+    document.getElementById('categoryForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const editId = document.getElementById('catEditId').value;
+      const type = document.getElementById('catType').value;
+      const limitRaw = document.getElementById('catLimit').value;
+      const monthlyLimit = (type === 'income' || !limitRaw) ? null : Number(limitRaw);
+
+      const data = {
+        name: document.getElementById('catName').value.trim(),
+        icon: document.getElementById('catIcon').value.trim() || '📌',
+        type: type,
+        monthlyLimit: monthlyLimit,
+        color: document.getElementById('catColor').value
+      };
+
+      if (editId) {
+        await db.categories.update(Number(editId), data);
+        showToast('Kategória frissítve.');
+      } else {
+        await db.categories.add(data);
+        showToast('Kategória létrehozva.');
+      }
+
+      document.getElementById('categoryFormCard').style.display = 'none';
+      refreshCategoryList();
+    });
+
+    document.getElementById('cancelCategoryForm').addEventListener('click', () => {
+      document.getElementById('categoryFormCard').style.display = 'none';
+    });
+
+    document.getElementById('openCategoryForm').addEventListener('click', openNewCategoryForm);
+
+    // ===== Tranzakciók =====
+    async function getCategoriesForType(type) {
+      // type: 'expense' vagy 'income'
+      // Visszaadja azokat a kategóriákat, amik kompatibilisek
+      const all = await db.categories.toArray();
+      if (type === 'expense') {
+        return all.filter(c => c.type === 'expense' || c.type === 'both');
+      } else {
+        return all.filter(c => c.type === 'income' || c.type === 'both');
+      }
+    }
+
+    function populateCategoryDropdown(selectEl, categories, selectedId = null) {
+      selectEl.innerHTML = '';
+      if (categories.length === 0) {
+        // Üres opció
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '— Válassz kategóriát —';
+        selectEl.appendChild(opt);
+        return;
+      }
+      for (const cat of categories) {
+        const opt = document.createElement('option');
+        opt.value = cat.id;
+        opt.textContent = (cat.icon || '📌') + ' ' + cat.name;
+        if (selectedId !== null && cat.id === selectedId) opt.selected = true;
+        selectEl.appendChild(opt);
+      }
+    }
+
+    async function refreshTransactionTypeDependents() {
+      const type = document.getElementById('txType').value;
+      const categories = await getCategoriesForType(type);
+      const selectEl = document.getElementById('txCategory');
+      const noMsg = document.getElementById('txNoCategoryMsg');
+
+      populateCategoryDropdown(selectEl, categories);
+      if (categories.length === 0) {
+        selectEl.style.display = 'none';
+        noMsg.style.display = 'block';
+      } else {
+        selectEl.style.display = 'block';
+        noMsg.style.display = 'none';
+      }
+    }
+
+    document.getElementById('txType').addEventListener('change', async () => {
+      document.getElementById('txCategory').value = ''; // Töröljük az előző választást
+      await refreshTransactionTypeDependents();
+    });
+
+    async function openTransactionForm(editId = null) {
+      document.getElementById('transactionFormCard').style.display = 'block';
+      document.getElementById('txEditId').value = editId || '';
+      document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
+      document.getElementById('txNote').value = '';
+      document.getElementById('txAmount').value = '';
+      document.getElementById('txType').value = 'expense';
+      document.getElementById('transactionFormTitle').textContent = editId ? 'Tranzakció szerkesztése' : 'Új tranzakció';
+
+      if (editId) {
+        const tx = await db.transactions.get(editId);
+        if (tx) {
+          document.getElementById('txType').value = tx.type || 'expense';
+          document.getElementById('txAmount').value = tx.amount;
+          document.getElementById('txDate').value = tx.date ? tx.date.split('T')[0] : '';
+          document.getElementById('txNote').value = tx.note || '';
+        }
+      }
+
+      await refreshTransactionTypeDependents();
+
+      // Ha edit van, állítsuk be a kategóriát a refresh után
+      if (editId) {
+        const tx = await db.transactions.get(editId);
+        if (tx && tx.categoryId) {
+          document.getElementById('txCategory').value = tx.categoryId;
+        }
+      }
+
+      updateCurrencyWrappers();
+      document.getElementById('txAmount').focus();
+    }
+
+    document.getElementById('transactionForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const editId = document.getElementById('txEditId').value;
+      const type = document.getElementById('txType').value;
+      const amount = Number(document.getElementById('txAmount').value);
+      const categoryId = document.getElementById('txCategory').value
+        ? Number(document.getElementById('txCategory').value)
+        : null;
+      const date = document.getElementById('txDate').value;
+      const note = document.getElementById('txNote').value.trim();
+
+      if (!amount || amount <= 0) {
+        showToast('Kérlek adj meg érvényes összeget.');
+        return;
+      }
+      if (!date) {
+        showToast('Kérlek válassz dátumot.');
+        return;
+      }
+
+      const data = {
+        amount: amount,
+        categoryId: categoryId,
+        date: new Date(date).toISOString(),
+        note: note,
+        source: 'manual',
+        currency: currentCurrency,
+        type: type
+      };
+
+      if (editId) {
+        await db.transactions.update(Number(editId), data);
+        showToast('Tranzakció frissítve.');
+      } else {
+        await db.transactions.add(data);
+        showToast('Tranzakció mentve ✅');
+      }
+
+      document.getElementById('transactionFormCard').style.display = 'none';
+      refreshTransactionList();
+      if (currentScreen === 'dashboard') refreshDashboard();
+    });
+
+    document.getElementById('cancelTransactionForm').addEventListener('click', () => {
+      document.getElementById('transactionFormCard').style.display = 'none';
+    });
+
+    document.getElementById('openTransactionForm').addEventListener('click', () => openTransactionForm());
+    document.getElementById('quickAddBtn').addEventListener('click', () => {
+      switchScreen('transactions');
+      setTimeout(() => openTransactionForm(), 100);
+    });
+
+    async function refreshTransactionList() {
+      const container = document.getElementById('transactionList');
+      const transactions = await db.transactions
+        .orderBy('date')
+        .reverse()
+        .limit(100)
+        .toArray();
+
+      if (transactions.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center mt-3">Még nincsenek tranzakciók.</p>';
+        return;
+      }
+
+      let html = '';
+      for (const tx of transactions) {
+        const cat = tx.categoryId ? await db.categories.get(tx.categoryId) : null;
+        const icon = cat ? cat.icon : (tx.type === 'income' ? '💰' : '💸');
+        const name = cat ? cat.name : (tx.type === 'income' ? 'Bevétel' : 'Kiadás');
+        const dateStr = tx.date ? new Date(tx.date).toLocaleDateString('hu-HU') : '—';
+        const amountClass = tx.type === 'income' ? 'income' : 'expense';
+        const sign = tx.type === 'income' ? '+' : '−';
+        const formattedAmount = sign + ' ' + formatAmount(tx.amount);
+
+        html += `
+          <div class="transaction-item">
+            <span class="transaction-icon">${icon}</span>
+            <div class="transaction-info">
+              <div class="transaction-name">${escapeHTML(name)}</div>
+              <div class="transaction-meta">${dateStr} ${tx.note ? '· ' + escapeHTML(tx.note) : ''}</div>
+            </div>
+            <span class="transaction-amount ${amountClass}">${formattedAmount}</span>
+            <div style="display:flex;gap:4px;flex-shrink:0;">
+              <button class="btn btn-outline btn-sm tx-edit-btn" data-id="${tx.id}" style="padding:4px 8px;min-height:32px;">✏️</button>
+              <button class="btn btn-danger btn-sm tx-delete-btn" data-id="${tx.id}" style="padding:4px 8px;min-height:32px;">🗑️</button>
+            </div>
+          </div>`;
+      }
+      container.innerHTML = html;
+
+      container.querySelectorAll('.tx-edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => openTransactionForm(Number(btn.dataset.id)));
+      });
+      container.querySelectorAll('.tx-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (confirm('Biztosan törlöd ezt a tranzakciót?')) {
+            await db.transactions.delete(Number(btn.dataset.id));
+            showToast('Tranzakció törölve.');
+            refreshTransactionList();
+            if (currentScreen === 'dashboard') refreshDashboard();
+          }
+        });
+      });
+    }
+
+    // ===== Dashboard =====
+    async function refreshDashboard() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth(); // 0-indexed
+      const monthStart = new Date(year, month, 1).toISOString();
+      const monthEnd = new Date(year, month + 1, 1).toISOString();
+
+      const monthTx = await db.transactions
+        .where('date')
+        .between(monthStart, monthEnd, true, false)
+        .toArray();
+
+      let totalIncome = 0;
+      let totalExpense = 0;
+      const expenseByCategory = {}; // categoryId -> összeg
+
+      for (const tx of monthTx) {
+        if (tx.type === 'income') {
+          totalIncome += tx.amount;
+        } else {
+          totalExpense += tx.amount;
+          const catId = tx.categoryId || 'uncategorized';
+          expenseByCategory[catId] = (expenseByCategory[catId] || 0) + tx.amount;
+        }
+      }
+
+      const balance = totalIncome - totalExpense;
+      const balanceEl = document.getElementById('balanceAmount');
+      balanceEl.textContent = formatAmount(balance);
+      balanceEl.className = 'balance-amount ' + (balance >= 0 ? 'positive' : 'negative');
+
+      document.getElementById('totalIncome').textContent = formatAmount(totalIncome);
+      document.getElementById('totalExpense').textContent = formatAmount(totalExpense);
+
+      // Tortadiagram — csak expense/both kategóriák
+      await updateExpenseChart(expenseByCategory);
+      await updatePrediction(totalExpense, monthTx);
+    }
+
+    async function updateExpenseChart(expenseByCategory) {
+      const canvas = document.getElementById('expenseChart');
+      const ctx = canvas.getContext('2d');
+      const noDataEl = document.getElementById('noChartData');
+
+      // Csak expense/both típusú kategóriák kiadásai
+      const entries = [];
+      for (const [catId, amount] of Object.entries(expenseByCategory)) {
+        let catName = 'Egyéb';
+        let catColor = '#999';
+        if (catId !== 'uncategorized') {
+          const cat = await db.categories.get(Number(catId));
+          if (cat && (cat.type === 'expense' || cat.type === 'both')) {
+            catName = cat.name;
+            catColor = cat.color || '#999';
+          } else if (cat && cat.type === 'income') {
+            // Kihagyjuk, ez income kategória
+            continue;
+          }
+        }
+        entries.push({ name: catName, amount, color: catColor });
+      }
+
+      if (entries.length === 0) {
+        noDataEl.style.display = 'block';
+        canvas.style.display = 'none';
+        if (chartInstance) {
+          chartInstance.destroy();
+          chartInstance = null;
+        }
+        return;
+      }
+
+      noDataEl.style.display = 'none';
+      canvas.style.display = 'block';
+
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+
+      chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: entries.map(e => e.name),
+          datasets: [{
+            data: entries.map(e => e.amount),
+            backgroundColor: entries.map(e => e.color),
+            borderWidth: 2,
+            borderColor: getComputedStyle(document.documentElement).getPropertyValue('--color-surface').trim() || '#fff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                padding: 12,
+                font: { size: 11 },
+                color: getComputedStyle(document.documentElement).getPropertyValue('--color-text').trim()
+              }
+            }
+          }
+        }
+      });
+    }
+
+    async function updatePrediction(currentMonthExpense, monthTx) {
+      const predText = document.getElementById('predictionText');
+      const now = new Date();
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const elapsedDays = now.getDate();
+
+      // Csak expense típusú kategóriákba sorolt kiadások
+      const expenseTx = [];
+      for (const tx of monthTx) {
+        if (tx.type === 'expense') {
+          if (tx.categoryId) {
+            const cat = await db.categories.get(tx.categoryId);
+            if (cat && (cat.type === 'expense' || cat.type === 'both')) {
+              expenseTx.push(tx);
+            }
+          } else {
+            expenseTx.push(tx);
+          }
+        }
+      }
+
+      if (expenseTx.length < 3) {
+        predText.textContent = 'Még nincs elég adat a predikcióhoz.';
+        return;
+      }
+
+      const predictedTotal = (currentMonthExpense / Math.max(elapsedDays, 1)) * daysInMonth;
+
+      // Előző hónap összehasonlítása
+      const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+      const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const prevTx = await db.transactions
+        .where('date')
+        .between(prevMonthStart, prevMonthEnd, true, false)
+        .toArray();
+      const prevTotalExpense = prevTx
+        .filter(tx => tx.type === 'expense')
+        .reduce((sum, tx) => sum + tx.amount, 0);
+
+      let comparisonText = '';
+      if (prevTotalExpense > 0) {
+        const diff = predictedTotal - prevTotalExpense;
+        if (diff > 0) {
+          comparisonText = ` (${formatAmountCompact(Math.abs(diff))}-val több, mint előző hónapban)`;
+        } else {
+          comparisonText = ` (${formatAmountCompact(Math.abs(diff))}-val kevesebb, mint előző hónapban)`;
+        }
+      }
+
+      // Limit túllépés ellenőrzése
+      const categories = await db.categories.toArray();
+      let worstCategory = null;
+      let worstExcess = 0;
+
+      for (const cat of categories) {
+        if (cat.type === 'income' || !cat.monthlyLimit) continue;
+        const catExpense = expenseTx
+          .filter(tx => tx.categoryId === cat.id)
+          .reduce((sum, tx) => sum + tx.amount, 0);
+        const catPredicted = (catExpense / Math.max(elapsedDays, 1)) * daysInMonth;
+        const excess = catPredicted - cat.monthlyLimit;
+        if (excess > worstExcess) {
+          worstExcess = excess;
+          worstCategory = cat;
+        }
+      }
+
+      if (worstCategory && worstExcess > 0) {
+        predText.innerHTML = `Ha így folytatod, hónap végéig kb. <strong>${formatAmountCompact(Math.round(worstExcess))}</strong>-val léped túl a <strong>${escapeHTML(worstCategory.name)}</strong> limitet.${comparisonText}`;
+      } else {
+        predText.innerHTML = `Az előrejelzés szerint a havi kiadásod kb. <strong>${formatAmountCompact(Math.round(predictedTotal))}</strong> lesz.${comparisonText}`;
+      }
+    }
+
+    // ===== Megtakarítási cél =====
+    async function refreshSavingsScreen() {
+      const goals = await db.savingsGoals.toArray();
+      const infoDiv = document.getElementById('savingsInfo');
+      const detailsDiv = document.getElementById('savingsDetails');
+      const formCard = document.getElementById('savingsFormCard');
+      const editBtn = document.getElementById('editSavingsBtn');
+
+      if (goals.length === 0) {
+        infoDiv.style.display = 'block';
+        detailsDiv.style.display = 'none';
+        editBtn.textContent = '🎯 Cél beállítása';
+        formCard.style.display = 'block';
+      } else {
+        const goal = goals[0];
+        infoDiv.style.display = 'none';
+        detailsDiv.style.display = 'block';
+        editBtn.textContent = '✏️ Cél szerkesztése';
+        formCard.style.display = 'none';
+
+        document.getElementById('savingsName').textContent = goal.name;
+        document.getElementById('savingsCurrent').textContent = formatAmount(goal.currentAmount);
+        document.getElementById('savingsTarget').textContent = formatAmount(goal.targetAmount);
+        const progress = goal.targetAmount > 0
+          ? Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100))
+          : 0;
+        document.getElementById('savingsProgress').style.width = progress + '%';
+        document.getElementById('savingsDeadline').textContent = goal.deadline
+          ? 'Határidő: ' + new Date(goal.deadline).toLocaleDateString('hu-HU')
+          : '';
+      }
+
+      updateCurrencyWrappers();
+    }
+
+    document.getElementById('editSavingsBtn').addEventListener('click', async () => {
+      const formCard = document.getElementById('savingsFormCard');
+      const goals = await db.savingsGoals.toArray();
+      if (goals.length > 0) {
+        const goal = goals[0];
+        document.getElementById('svName').value = goal.name;
+        document.getElementById('svTargetAmount').value = goal.targetAmount;
+        document.getElementById('svCurrentAmount').value = goal.currentAmount;
+        document.getElementById('svDeadline').value = goal.deadline ? goal.deadline.split('T')[0] : '';
+        document.getElementById('savingsFormTitle').textContent = 'Cél szerkesztése';
+      } else {
+        document.getElementById('svName').value = '';
+        document.getElementById('svTargetAmount').value = '';
+        document.getElementById('svCurrentAmount').value = '';
+        document.getElementById('svDeadline').value = '';
+        document.getElementById('savingsFormTitle').textContent = 'Új cél';
+      }
+      formCard.style.display = 'block';
+      updateCurrencyWrappers();
+    });
+
+    document.getElementById('savingsForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('svName').value.trim();
+      const targetAmount = Number(document.getElementById('svTargetAmount').value);
+      const currentAmount = Number(document.getElementById('svCurrentAmount').value);
+      const deadline = document.getElementById('svDeadline').value
+        ? new Date(document.getElementById('svDeadline').value).toISOString()
+        : null;
+
+      if (!name || !targetAmount || targetAmount <= 0) {
+        showToast('Kérlek tölts ki minden kötelező mezőt.');
+        return;
+      }
+
+      const goals = await db.savingsGoals.toArray();
+      if (goals.length > 0) {
+        await db.savingsGoals.update(goals[0].id, {
+          name, targetAmount, currentAmount, deadline,
+          linkedCategoryIds: goals[0].linkedCategoryIds || []
+        });
+        showToast('Cél frissítve.');
+      } else {
+        await db.savingsGoals.add({
+          name, targetAmount, currentAmount, deadline, linkedCategoryIds: []
+        });
+        showToast('Cél létrehozva.');
+      }
+
+      document.getElementById('savingsFormCard').style.display = 'none';
+      refreshSavingsScreen();
+    });
+
+    document.getElementById('addToSavingsBtn').addEventListener('click', async () => {
+      document.getElementById('addToSavingsFormCard').style.display = 'block';
+      document.getElementById('addSvAmount').value = '';
+      // Töltsük fel a kategória dropdown-t expense kategóriákkal
+      const cats = await getCategoriesForType('expense');
+      populateCategoryDropdown(document.getElementById('addSvCategory'), cats);
+      updateCurrencyWrappers();
+    });
+
+    document.getElementById('cancelAddToSavings').addEventListener('click', () => {
+      document.getElementById('addToSavingsFormCard').style.display = 'none';
+    });
+
+    document.getElementById('addToSavingsForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const amount = Number(document.getElementById('addSvAmount').value);
+      const categoryId = document.getElementById('addSvCategory').value
+        ? Number(document.getElementById('addSvCategory').value)
+        : null;
+
+      if (!amount || amount <= 0) {
+        showToast('Kérlek adj meg érvényes összeget.');
+        return;
+      }
+
+      const goals = await db.savingsGoals.toArray();
+      if (goals.length === 0) {
+        showToast('Nincs beállított megtakarítási cél.');
+        return;
+      }
+
+      const goal = goals[0];
+      const newCurrent = goal.currentAmount + amount;
+      await db.savingsGoals.update(goal.id, { currentAmount: newCurrent });
+
+      // Rögzítsük kiadásként
+      await db.transactions.add({
+        amount: amount,
+        categoryId: categoryId,
+        date: new Date().toISOString(),
+        note: 'Megtakarítás: ' + goal.name,
+        source: 'manual',
+        currency: currentCurrency,
+        type: 'expense'
+      });
+
+      showToast(`${formatAmount(amount)} hozzáadva a célhoz!`);
+      document.getElementById('addToSavingsFormCard').style.display = 'none';
+      refreshSavingsScreen();
+      if (currentScreen === 'dashboard') refreshDashboard();
+    });
+
+    // ===== OCR =====
+    function setupOCRScreen() {
+      updateCurrencyWrappers();
+    }
+
+    document.getElementById('ocrSelectImage').addEventListener('click', () => {
+      document.getElementById('ocrFileInput').click();
+    });
+
+    document.getElementById('ocrFileInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const statusEl = document.getElementById('ocrStatus');
+      const resultEl = document.getElementById('ocrResult');
+      const noResultEl = document.getElementById('ocrNoResult');
+
+      statusEl.style.display = 'block';
+      statusEl.textContent = 'OCR feldolgozás... ⏳';
+      resultEl.style.display = 'none';
+      noResultEl.style.display = 'none';
+
+      try {
+        // Tesseract.js betöltése (ha még nincs)
+        if (typeof Tesseract === 'undefined') {
+          throw new Error('Tesseract.js nem töltődött be. Kérlek frissítsd az oldalt.');
+        }
+
+        const { data: { text } } = await Tesseract.recognize(file, 'eng+hun', {
+          logger: m => {
+            if (m.status === 'recognizing text') {
+              statusEl.textContent = `OCR feldolgozás... ${Math.round(m.progress * 100)}%`;
+            }
+          }
         });
 
-        // Alapértelmezett kategóriák
-        const defaultCategories = [
-            { name: 'Lakhatás', icon: '🏠', monthlyLimit: 150000, color: '#E74C3C' },
-            { name: 'Élelmiszer', icon: '🛒', monthlyLimit: 80000, color: '#F39C12' },
-            { name: 'Közlekedés', icon: '🚗', monthlyLimit: 30000, color: '#3498DB' },
-            { name: 'Szórakozás', icon: '🎮', monthlyLimit: 20000, color: '#9B59B6' },
-            { name: 'Megtakarítás', icon: '💰', monthlyLimit: null, color: '#27AE60' },
-            { name: 'Bevétel', icon: '💵', monthlyLimit: null, color: '#2ECC71' }
-        ];
+        statusEl.style.display = 'none';
+        const rawText = text;
+        document.getElementById('ocrRawText').textContent = rawText;
 
-        let currentCurrency = 'HUF';
-        let chart = null;
-        let currentPage = 'dashboard';
-        let pendingTransaction = null;
-
-        // Pénznem formázás
-        function formatCurrency(amount, currency = currentCurrency) {
-            try {
-                if (currency === 'HUF') {
-                    return Math.round(amount).toLocaleString('hu-HU', { maximumFractionDigits: 0 }) + ' Ft';
-                } else if (currency === 'EUR') {
-                    return '€ ' + amount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                } else if (currency === 'USD') {
-                    return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                }
-            } catch (e) {
-                console.error('Formatting error:', e);
-                return amount.toString();
-            }
-            return amount.toString();
+        // Regex minták
+        let amountMatch = null;
+        if (currentCurrency === 'HUF') {
+          amountMatch = rawText.match(/(\d[\d\s]*)\s?(Ft|HUF)/i);
+          if (amountMatch) {
+            amountMatch = amountMatch[1].replace(/\s/g, '');
+          }
+        } else if (currentCurrency === 'EUR') {
+          amountMatch = rawText.match(/€?\s?(\d+[.,]\d{2})/);
+          if (amountMatch) {
+            amountMatch = amountMatch[1].replace(',', '.');
+          }
+        } else if (currentCurrency === 'USD') {
+          amountMatch = rawText.match(/\$?\s?(\d+[.,]\d{2})/);
+          if (amountMatch) {
+            amountMatch = amountMatch[1].replace(',', '.');
+          }
         }
 
-        // Toast értesítés
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            if (!toast) {
-                console.error('Toast element not found');
-                alert(message);
-                return;
-            }
-            toast.textContent = message;
-            toast.classList.add('show');
-            setTimeout(() => {
-                if (toast) toast.classList.remove('show');
-            }, 2000);
+        // Dátum keresés
+        const dateMatch1 = rawText.match(/(\d{4})[-./](\d{2})[-./](\d{2})/);
+        const dateMatch2 = rawText.match(/(\d{2})[-./](\d{2})[-./](\d{4})/);
+        let dateStr = '';
+        if (dateMatch1) {
+          dateStr = `${dateMatch1[1]}-${dateMatch1[2]}-${dateMatch1[3]}`;
+        } else if (dateMatch2) {
+          dateStr = `${dateMatch2[3]}-${dateMatch2[2]}-${dateMatch2[1]}`;
         }
 
-        // Navigáció
-        function navigateTo(page) {
-            try {
-                const pages = document.querySelectorAll('.page');
-                pages.forEach(p => p.classList.remove('active'));
-                
-                const targetPage = document.getElementById(page + '-page');
-                if (targetPage) {
-                    targetPage.classList.add('active');
-                }
-                
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                const buttons = document.querySelectorAll('.tab-btn');
-                const pageIndex = ['dashboard', 'transactions', 'categories', 'savings', 'ocr', 'settings'].indexOf(page);
-                if (buttons[pageIndex]) buttons[pageIndex].classList.add('active');
-                
-                currentPage = page;
-                loadPageContent(page);
-            } catch (error) {
-                console.error('Navigation error:', error);
-            }
-        }
+        const hasAmount = amountMatch && !isNaN(parseFloat(amountMatch));
+        const hasDate = dateStr && !isNaN(new Date(dateStr).getTime());
 
-        async function loadPageContent(page) {
-            try {
-                switch(page) {
-                    case 'dashboard':
-                        await loadDashboard();
-                        break;
-                    case 'transactions':
-                        await loadTransactions();
-                        break;
-                    case 'categories':
-                        await loadCategories();
-                        break;
-                    case 'savings':
-                        await loadSavingsGoals();
-                        break;
-                    case 'settings':
-                        await loadSettings();
-                        break;
-                }
-            } catch (error) {
-                console.error(`Error loading ${page}:`, error);
-            }
+        if (hasAmount || hasDate) {
+          resultEl.style.display = 'block';
+          document.getElementById('ocrAmount').value = hasAmount ? parseFloat(amountMatch) : '';
+          document.getElementById('ocrDate').value = hasDate ? dateStr : '';
+          document.getElementById('ocrNote').value = 'OCR beolvasás';
+          document.getElementById('ocrType').value = 'expense';
+          await refreshOCRCategoryDropdown();
+          updateCurrencyWrappers();
+        } else {
+          noResultEl.style.display = 'block';
+          // Előtöltjük a formot üresen, hogy manuálisan kitölthető legyen
+          resultEl.style.display = 'block';
+          document.getElementById('ocrAmount').value = '';
+          document.getElementById('ocrDate').value = '';
+          document.getElementById('ocrNote').value = '';
+          document.getElementById('ocrType').value = 'expense';
+          await refreshOCRCategoryDropdown();
+          updateCurrencyWrappers();
         }
+      } catch (err) {
+        statusEl.style.display = 'none';
+        noResultEl.style.display = 'block';
+        document.getElementById('ocrRawText').textContent = 'Hiba: ' + err.message;
+        resultEl.style.display = 'block';
+        document.getElementById('ocrAmount').value = '';
+        document.getElementById('ocrDate').value = '';
+        updateCurrencyWrappers();
+        console.error('OCR hiba:', err);
+      }
+    });
 
-        // Settings
-        async function loadSettings() {
-            try {
-                const setting = await db.settings.get('currency');
-                if (setting) {
-                    currentCurrency = setting.value;
-                    const select = document.getElementById('currency-select');
-                    if (select) select.value = currentCurrency;
-                }
-            } catch (error) {
-                console.error('Error loading settings:', error);
-            }
+    async function refreshOCRCategoryDropdown() {
+      const type = document.getElementById('ocrType').value;
+      const cats = await getCategoriesForType(type);
+      const selectEl = document.getElementById('ocrCategory');
+      const noMsg = document.getElementById('ocrNoCategoryMsg');
+      populateCategoryDropdown(selectEl, cats);
+      if (cats.length === 0) {
+        selectEl.style.display = 'none';
+        noMsg.style.display = 'block';
+      } else {
+        selectEl.style.display = 'block';
+        noMsg.style.display = 'none';
+      }
+    }
+
+    document.getElementById('ocrType').addEventListener('change', refreshOCRCategoryDropdown);
+
+    document.getElementById('ocrConfirmForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const amount = Number(document.getElementById('ocrAmount').value);
+      const date = document.getElementById('ocrDate').value;
+      const type = document.getElementById('ocrType').value;
+      const categoryId = document.getElementById('ocrCategory').value
+        ? Number(document.getElementById('ocrCategory').value)
+        : null;
+      const note = document.getElementById('ocrNote').value.trim() || 'OCR beolvasás';
+
+      if (!amount || amount <= 0) {
+        showToast('Kérlek adj meg érvényes összeget.');
+        return;
+      }
+      if (!date) {
+        showToast('Kérlek válassz dátumot.');
+        return;
+      }
+
+      await db.transactions.add({
+        amount: amount,
+        categoryId: categoryId,
+        date: new Date(date).toISOString(),
+        note: note,
+        source: 'ocr',
+        currency: currentCurrency,
+        type: type
+      });
+
+      showToast('OCR tranzakció mentve ✅');
+      document.getElementById('ocrResult').style.display = 'none';
+      document.getElementById('ocrNoResult').style.display = 'none';
+      document.getElementById('ocrFileInput').value = '';
+      if (currentScreen === 'dashboard') refreshDashboard();
+      refreshTransactionList();
+    });
+
+    // ===== Limit-túllépés kezelés (Dashboard részeként) =====
+    // Ezt a predikciónál és a kategória listában jelezzük.
+    // A "Vond le a túllépést egy másik kategória maradék limitjéből" funkció
+    // a dashboard-on jelenik meg, ha van túllépés.
+
+    // ===== Tab bar események =====
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (currentCurrency === null && btn.dataset.screen !== 'currency') {
+          // Ha nincs még pénznem, ne engedjük a váltást
+          return;
         }
+        switchScreen(btn.dataset.screen);
+      });
+    });
 
-        async function changeCurrency() {
-            try {
-                currentCurrency = document.getElementById('currency-select').value;
-                await db.settings.put({ key: 'currency', value: currentCurrency });
-                await loadDashboard();
-                showToast('Pénznem módosítva');
-            } catch (error) {
-                console.error('Error changing currency:', error);
-                showToast('Hiba a pénznem módosításakor');
-            }
-        }
+    // ===== PWA — Install prompt =====
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      pendingInstallPrompt = e;
+      document.getElementById('install-banner').classList.add('show');
+    });
 
-        // Tranzakciók CRUD
-        async function loadTransactions() {
-            try {
-                const transactions = await db.transactions.orderBy('date').reverse().toArray();
-                const categories = await db.categories.toArray();
-                const categoryMap = {};
-                categories.forEach(c => categoryMap[c.id] = c);
-                
-                const list = document.getElementById('transaction-list');
-                if (!list) return;
-                
-                if (transactions.length === 0) {
-                    list.innerHTML = '<div class="empty-state"><div class="empty-icon">💳</div><p>Még nincsenek tranzakciók</p></div>';
-                    return;
-                }
-                
-                list.innerHTML = transactions.map(t => {
-                    const cat = categoryMap[t.categoryId] || { name: 'Ismeretlen', icon: '❓', color: '#95A5A6' };
-                    const amount = t.amount || 0;
-                    return `
-                        <div class="transaction-item">
-                            <div class="transaction-info">
-                                <span class="category-badge" style="border-left: 3px solid ${cat.color}">
-                                    ${cat.icon} ${cat.name}
-                                </span>
-                                <div class="transaction-meta">${new Date(t.date).toLocaleDateString('hu-HU')} ${t.note ? '- ' + t.note : ''}</div>
-                            </div>
-                            <div class="transaction-amount ${amount < 0 ? 'expense' : 'income'}">
-                                ${amount < 0 ? '-' : '+'}${formatCurrency(Math.abs(amount), t.currency || currentCurrency)}
-                            </div>
-                            <div style="display: flex; gap: 8px; margin-left: 12px;">
-                                <button class="btn btn-sm btn-outline" onclick="editTransaction(${t.id})" aria-label="Szerkesztés">✏️</button>
-                                <button class="btn btn-sm btn-danger" onclick="deleteTransaction(${t.id})" aria-label="Törlés">🗑️</button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            } catch (error) {
-                console.error('Error loading transactions:', error);
-            }
-        }
+    document.getElementById('install-banner').addEventListener('click', async () => {
+      if (pendingInstallPrompt) {
+        pendingInstallPrompt.prompt();
+        const result = await pendingInstallPrompt.userChoice;
+        console.log('Install result:', result.outcome);
+        pendingInstallPrompt = null;
+        document.getElementById('install-banner').classList.remove('show');
+      }
+    });
 
-        function showTransactionForm(transaction = null) {
-            const form = document.getElementById('transaction-form');
-            if (!form) return;
-            
-            form.style.display = 'block';
-            
-            if (transaction) {
-                document.getElementById('form-title').textContent = 'Tranzakció szerkesztése';
-                document.getElementById('trans-id').value = transaction.id;
-                document.getElementById('trans-type').value = transaction.amount < 0 ? 'expense' : 'income';
-                document.getElementById('trans-amount').value = Math.abs(transaction.amount);
-                document.getElementById('trans-date').value = transaction.date;
-                document.getElementById('trans-note').value = transaction.note || '';
-                document.getElementById('trans-category').value = transaction.categoryId;
-            } else {
-                document.getElementById('form-title').textContent = 'Új tranzakció';
-                document.getElementById('trans-id').value = '';
-                document.getElementById('trans-amount').value = '';
-                document.getElementById('trans-note').value = '';
-                document.getElementById('trans-date').value = new Date().toISOString().split('T')[0];
-            }
-            
-            loadCategoryDropdown();
-            form.scrollIntoView({ behavior: 'smooth' });
-        }
+    // Standalone mód detektálás
+    function checkStandalone() {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+        || navigator.standalone
+        || document.referrer.includes('android-app://');
+      if (!isStandalone && !pendingInstallPrompt) {
+        // Ha nem standalone és nincs függőben lévő install prompt,
+        // akkor is mutathatjuk a bannert
+        document.getElementById('install-banner').classList.add('show');
+      } else if (isStandalone) {
+        document.getElementById('install-banner').classList.remove('show');
+      }
+    }
+    checkStandalone();
+    window.addEventListener('appinstalled', () => {
+      document.getElementById('install-banner').classList.remove('show');
+      pendingInstallPrompt = null;
+      showToast('App sikeresen telepítve! 🎉');
+    });
 
-        function hideTransactionForm() {
-            const form = document.getElementById('transaction-form');
-            if (form) form.style.display = 'none';
-        }
+    // ===== Service Worker regisztráció és update flow =====
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+          .then(registration => {
+            console.log('SW regisztrálva:', registration.scope);
 
-        async function loadCategoryDropdown() {
-            try {
-                const categories = await db.categories.toArray();
-                const select = document.getElementById('trans-category');
-                if (!select) return;
-                
-                if (categories.length === 0) {
-                    select.innerHTML = '<option value="">Nincsenek kategóriák</option>';
-                    return;
-                }
-                
-                select.innerHTML = categories.map(c => 
-                    `<option value="${c.id}">${c.icon} ${c.name}</option>`
-                ).join('');
-            } catch (error) {
-                console.error('Error loading category dropdown:', error);
-            }
-        }
-
-        async function saveTransaction(event) {
-            event.preventDefault();
-            
-            try {
-                const id = document.getElementById('trans-id').value;
-                const type = document.getElementById('trans-type').value;
-                let amount = parseFloat(document.getElementById('trans-amount').value);
-                const categoryId = parseInt(document.getElementById('trans-category').value);
-                const date = document.getElementById('trans-date').value;
-                const note = document.getElementById('trans-note').value;
-                
-                if (!amount || !categoryId || !date) {
-                    showToast('Kérlek tölts ki minden kötelező mezőt');
-                    return;
-                }
-                
-                if (type === 'expense') amount = -Math.abs(amount);
-                else amount = Math.abs(amount);
-                
-                const transaction = {
-                    amount,
-                    categoryId,
-                    date,
-                    note: note || '',
-                    source: 'manual',
-                    currency: currentCurrency
-                };
-                
-                if (id) {
-                    transaction.id = parseInt(id);
-                    await db.transactions.put(transaction);
-                } else {
-                    // Ellenőrizzük a kategória limitet
-                    if (amount < 0) {
-                        const limitExceeded = await checkCategoryLimit(categoryId, Math.abs(amount));
-                        if (limitExceeded) {
-                            pendingTransaction = transaction;
-                            showLimitModal(categoryId, Math.abs(amount));
-                            return;
-                        }
-                    }
-                    await db.transactions.add(transaction);
-                }
-                
-                hideTransactionForm();
-                await loadTransactions();
-                await loadDashboard();
-                showToast('Tranzakció mentve');
-            } catch (error) {
-                console.error('Error saving transaction:', error);
-                showToast('Hiba a tranzakció mentésekor: ' + error.message);
-            }
-        }
-
-        async function editTransaction(id) {
-            try {
-                const transaction = await db.transactions.get(id);
-                if (transaction) {
-                    showTransactionForm(transaction);
-                }
-            } catch (error) {
-                console.error('Error editing transaction:', error);
-            }
-        }
-
-        async function deleteTransaction(id) {
-            if (confirm('Biztosan törlöd ezt a tranzakciót?')) {
-                try {
-                    await db.transactions.delete(id);
-                    await loadTransactions();
-                    await loadDashboard();
-                    showToast('Tranzakció törölve');
-                } catch (error) {
-                    console.error('Error deleting transaction:', error);
-                    showToast('Hiba a törléskor');
-                }
-            }
-        }
-
-        // Kategória kezelés - JAVÍTVA
-        async function loadCategories() {
-            try {
-                console.log('Loading categories...');
-                const categories = await db.categories.toArray();
-                console.log('Categories loaded:', categories);
-                
-                const list = document.getElementById('category-list');
-                if (!list) return;
-                
-                if (categories.length === 0) {
-                    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📁</div><p>Még nincsenek kategóriák. Az alapértelmezett kategóriák betöltése folyamatban...</p></div>';
-                    // Próbáljuk meg betölteni az alapértelmezett kategóriákat
-                    await initializeDefaultCategories();
-                    // Újratöltés
-                    setTimeout(() => loadCategories(), 500);
-                    return;
-                }
-                
-                const now = new Date();
-                const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-                
-                const transactions = await db.transactions
-                    .where('date')
-                    .startsWith(currentMonth)
-                    .toArray();
-                
-                const categorySpending = {};
-                transactions.forEach(t => {
-                    if (t.amount < 0) {
-                        categorySpending[t.categoryId] = (categorySpending[t.categoryId] || 0) + Math.abs(t.amount);
-                    }
+            // Új SW figyelése
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              if (newWorker) {
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    // Új SW vár — mutassuk a frissítés toastot
+                    newWorkerWaiting = newWorker;
+                    const updateToast = document.getElementById('update-toast');
+                    updateToast.classList.add('show');
+                    console.log('Új SW vár — frissítés elérhető');
+                  }
                 });
-                
-                list.innerHTML = categories.map(c => {
-                    const spent = categorySpending[c.id] || 0;
-                    const limit = c.monthlyLimit || 0;
-                    const percentage = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
-                    const isOverLimit = limit > 0 && spent > limit;
-                    
-                    return `
-                        <div class="transaction-item">
-                            <div class="transaction-info">
-                                <span class="category-badge" style="border-left: 4px solid ${c.color}">
-                                    ${c.icon} ${c.name}
-                                    ${isOverLimit ? '<span class="badge badge-danger">Túllépve</span>' : ''}
-                                </span>
-                                ${limit > 0 ? `
-                                    <div style="font-size: 14px; margin-top: 8px;">
-                                        ${formatCurrency(spent)} / ${formatCurrency(limit)}
-                                    </div>
-                                    <div class="progress-bar">
-                                        <div class="progress-fill ${isOverLimit ? 'danger' : ''}" style="width: ${percentage}%; background: ${c.color}"></div>
-                                    </div>
-                                ` : ''}
-                            </div>
-                            <div style="display: flex; gap: 8px;">
-                                <button class="btn btn-sm btn-outline" onclick="editCategory(${c.id})" aria-label="Szerkesztés">✏️</button>
-                                <button class="btn btn-sm btn-danger" onclick="deleteCategory(${c.id})" aria-label="Törlés">🗑️</button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            } catch (error) {
-                console.error('Error loading categories:', error);
-                const list = document.getElementById('category-list');
-                if (list) {
-                    list.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div><p>Hiba a kategóriák betöltésekor: ${error.message}</p></div>`;
-                }
-            }
-        }
-
-        function showCategoryForm(category = null) {
-            const form = document.getElementById('category-form');
-            if (!form) return;
-            
-            form.style.display = 'block';
-            
-            if (category) {
-                document.getElementById('category-form-title').textContent = 'Kategória szerkesztése';
-                document.getElementById('cat-id').value = category.id;
-                document.getElementById('cat-name').value = category.name;
-                document.getElementById('cat-icon').value = category.icon;
-                document.getElementById('cat-color').value = category.color;
-                document.getElementById('cat-limit').value = category.monthlyLimit || '';
-            } else {
-                document.getElementById('category-form-title').textContent = 'Új kategória';
-                document.getElementById('cat-id').value = '';
-                document.getElementById('cat-name').value = '';
-                document.getElementById('cat-icon').value = '📁';
-                document.getElementById('cat-color').value = '#4A90D9';
-                document.getElementById('cat-limit').value = '';
-            }
-        }
-
-        function hideCategoryForm() {
-            const form = document.getElementById('category-form');
-            if (form) form.style.display = 'none';
-        }
-
-        async function saveCategory(event) {
-            event.preventDefault();
-            
-            try {
-                console.log('Saving category...');
-                
-                const id = document.getElementById('cat-id').value;
-                const name = document.getElementById('cat-name').value;
-                const icon = document.getElementById('cat-icon').value;
-                const color = document.getElementById('cat-color').value;
-                const limitValue = document.getElementById('cat-limit').value;
-                
-                if (!name || !icon || !color) {
-                    showToast('Kérlek tölts ki minden kötelező mezőt');
-                    return;
-                }
-                
-                const category = {
-                    name: name,
-                    icon: icon,
-                    color: color,
-                    monthlyLimit: limitValue ? parseFloat(limitValue) : null
-                };
-                
-                console.log('Category data:', category);
-                
-                let result;
-                if (id) {
-                    category.id = parseInt(id);
-                    result = await db.categories.put(category);
-                    console.log('Category updated:', result);
-                } else {
-                    result = await db.categories.add(category);
-                    console.log('Category added:', result);
-                }
-                
-                hideCategoryForm();
-                await loadCategories();
-                showToast('Kategória mentve');
-            } catch (error) {
-                console.error('Error saving category:', error);
-                showToast('Hiba a kategória mentésekor: ' + error.message);
-            }
-        }
-
-        async function editCategory(id) {
-            try {
-                const category = await db.categories.get(id);
-                if (category) {
-                    showCategoryForm(category);
-                }
-            } catch (error) {
-                console.error('Error editing category:', error);
-            }
-        }
-
-        async function deleteCategory(id) {
-            if (confirm('Biztosan törlöd ezt a kategóriát? A hozzá tartozó tranzakciók megmaradnak.')) {
-                try {
-                    await db.categories.delete(id);
-                    await loadCategories();
-                    showToast('Kategória törölve');
-                } catch (error) {
-                    console.error('Error deleting category:', error);
-                    showToast('Hiba a törléskor');
-                }
-            }
-        }
-
-        // Limit túllépés kezelése
-        async function checkCategoryLimit(categoryId, amount) {
-            try {
-                const category = await db.categories.get(categoryId);
-                if (!category || !category.monthlyLimit) return false;
-                
-                const now = new Date();
-                const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-                
-                const transactions = await db.transactions
-                    .where('date')
-                    .startsWith(currentMonth)
-                    .toArray();
-                
-                const currentSpending = transactions
-                    .filter(t => t.categoryId === categoryId && t.amount < 0)
-                    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-                
-                return (currentSpending + amount) > category.monthlyLimit;
-            } catch (error) {
-                console.error('Error checking limit:', error);
-                return false;
-            }
-        }
-
-        function showLimitModal(categoryId, amount) {
-            const modal = document.getElementById('limit-modal');
-            if (!modal) return;
-            
-            document.getElementById('limit-message').textContent = 
-                `Ez a tranzakció (${formatCurrency(amount)}) túllépné a kategória havi limitjét.`;
-            
-            loadCategoriesForTransfer();
-            modal.style.display = 'flex';
-        }
-
-        async function loadCategoriesForTransfer() {
-            try {
-                const categories = await db.categories.toArray();
-                const now = new Date();
-                const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-                
-                const transactions = await db.transactions
-                    .where('date')
-                    .startsWith(currentMonth)
-                    .toArray();
-                
-                const select = document.getElementById('limit-transfer-category');
-                if (!select) return;
-                
-                const options = categories
-                    .filter(c => c.monthlyLimit)
-                    .map(c => {
-                        const spent = transactions
-                            .filter(t => t.categoryId === c.id && t.amount < 0)
-                            .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-                        const remaining = c.monthlyLimit - spent;
-                        return { ...c, remaining };
-                    })
-                    .filter(c => c.remaining > 0);
-                
-                select.innerHTML = options
-                    .map(c => `<option value="${c.id}">${c.icon} ${c.name} (Maradék: ${formatCurrency(c.remaining)})</option>`)
-                    .join('');
-                
-                const status = document.getElementById('limit-transfer-status');
-                if (status) {
-                    status.textContent = options.length === 0 ? 
-                        'Nincs elég maradék más kategóriákban. A tranzakció mentése nem lehetséges.' : '';
-                }
-            } catch (error) {
-                console.error('Error loading categories for transfer:', error);
-            }
-        }
-
-        async function transferLimit() {
-            try {
-                const categoryId = parseInt(document.getElementById('limit-transfer-category').value);
-                if (!categoryId || !pendingTransaction) return;
-                
-                await db.transactions.add(pendingTransaction);
-                pendingTransaction = null;
-                closeLimitModal();
-                hideTransactionForm();
-                await loadTransactions();
-                await loadDashboard();
-                showToast('Tranzakció mentve limitátvezetéssel');
-            } catch (error) {
-                console.error('Error transferring limit:', error);
-                showToast('Hiba az átvezetéskor');
-            }
-        }
-
-        function closeLimitModal() {
-            const modal = document.getElementById('limit-modal');
-            if (modal) modal.style.display = 'none';
-            pendingTransaction = null;
-        }
-
-        // Megtakarítási célok
-        async function loadSavingsGoals() {
-            try {
-                const goals = await db.savingsGoals.toArray();
-                const container = document.getElementById('savings-goal');
-                if (!container) return;
-                
-                if (goals.length === 0) {
-                    container.innerHTML = '<div class="empty-state"><div class="empty-icon">🎯</div><p>Még nincs megtakarítási cél</p></div>';
-                    return;
-                }
-                
-                container.innerHTML = goals.map(g => {
-                    const percentage = g.targetAmount > 0 ? Math.min((g.currentAmount / g.targetAmount) * 100, 100) : 0;
-                    const deadline = g.deadline ? new Date(g.deadline).toLocaleDateString('hu-HU') : 'Nincs';
-                    
-                    return `
-                        <div style="margin-bottom: 24px;">
-                            <h3>${g.name}</h3>
-                            <div class="progress-bar" style="height: 20px; border-radius: 10px;">
-                                <div class="progress-fill" style="width: ${percentage}%; background: var(--color-success);"></div>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-top: 8px;">
-                                <span>${formatCurrency(g.currentAmount)}</span>
-                                <span>${formatCurrency(g.targetAmount)}</span>
-                            </div>
-                            <div style="font-size: 14px; color: var(--color-text-secondary); margin-top: 8px;">
-                                Határidő: ${deadline}
-                            </div>
-                            <div class="grid-2" style="margin-top: 16px;">
-                                <button class="btn btn-sm btn-success" onclick="addToSavings(${g.id})">💰 Hozzáadás</button>
-                                <button class="btn btn-sm btn-danger" onclick="deleteSavingsGoal(${g.id})">🗑️ Törlés</button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            } catch (error) {
-                console.error('Error loading savings goals:', error);
-            }
-        }
-
-        function showSavingsForm() {
-            const form = document.getElementById('savings-form');
-            if (form) form.style.display = 'block';
-        }
-
-        function hideSavingsForm() {
-            const form = document.getElementById('savings-form');
-            if (form) form.style.display = 'none';
-        }
-
-        async function saveSavingsGoal(event) {
-            event.preventDefault();
-            
-            try {
-                const goal = {
-                    name: document.getElementById('savings-name').value,
-                    targetAmount: parseFloat(document.getElementById('savings-target').value),
-                    currentAmount: parseFloat(document.getElementById('savings-current').value) || 0,
-                    deadline: document.getElementById('savings-deadline').value || null,
-                    linkedCategoryIds: []
-                };
-                
-                await db.savingsGoals.add(goal);
-                hideSavingsForm();
-                document.getElementById('savings-form').querySelector('form').reset();
-                await loadSavingsGoals();
-                showToast('Cél mentve');
-            } catch (error) {
-                console.error('Error saving savings goal:', error);
-                showToast('Hiba a cél mentésekor');
-            }
-        }
-
-        async function addToSavings(goalId) {
-            const amount = prompt('Mennyit szeretnél hozzáadni?');
-            if (!amount || isNaN(amount)) return;
-            
-            try {
-                const numAmount = parseFloat(amount);
-                const goal = await db.savingsGoals.get(goalId);
-                
-                if (goal) {
-                    await db.savingsGoals.update(goalId, { 
-                        currentAmount: goal.currentAmount + numAmount 
-                    });
-                    
-                    // Megtakarítás kategória keresése vagy létrehozása
-                    let savingsCat = await db.categories.where('name').equals('Megtakarítás').first();
-                    if (!savingsCat) {
-                        savingsCat = { name: 'Megtakarítás', icon: '💰', monthlyLimit: null, color: '#27AE60' };
-                        savingsCat.id = await db.categories.add(savingsCat);
-                    }
-                    
-                    await db.transactions.add({
-                        amount: -numAmount,
-                        categoryId: savingsCat.id,
-                        date: new Date().toISOString().split('T')[0],
-                        note: `Megtakarítás: ${goal.name}`,
-                        source: 'manual',
-                        currency: currentCurrency
-                    });
-                    
-                    await loadSavingsGoals();
-                    await loadDashboard();
-                    showToast('Megtakarítás frissítve');
-                }
-            } catch (error) {
-                console.error('Error adding to savings:', error);
-                showToast('Hiba a megtakarítás frissítésekor');
-            }
-        }
-
-        async function deleteSavingsGoal(id) {
-            if (confirm('Biztosan törlöd ezt a célt?')) {
-                try {
-                    await db.savingsGoals.delete(id);
-                    await loadSavingsGoals();
-                    showToast('Cél törölve');
-                } catch (error) {
-                    console.error('Error deleting savings goal:', error);
-                    showToast('Hiba a törléskor');
-                }
-            }
-        }
-
-        // Dashboard
-        async function loadDashboard() {
-            try {
-                const now = new Date();
-                const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-                const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-                const daysElapsed = now.getDate();
-                
-                const transactions = await db.transactions.toArray();
-                const monthlyTransactions = transactions.filter(t => t.date.startsWith(currentMonth));
-                
-                const income = monthlyTransactions
-                    .filter(t => t.amount > 0)
-                    .reduce((sum, t) => sum + t.amount, 0);
-                
-                const expenses = monthlyTransactions
-                    .filter(t => t.amount < 0)
-                    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-                
-                const balance = income - expenses;
-                
-                const balanceElement = document.getElementById('balance');
-                if (balanceElement) {
-                    balanceElement.textContent = (balance >= 0 ? '+' : '') + formatCurrency(balance);
-                }
-                
-                // Kategóriák a diagramhoz
-                const categories = await db.categories.toArray();
-                const categoryExpenses = {};
-                
-                monthlyTransactions
-                    .filter(t => t.amount < 0)
-                    .forEach(t => {
-                        categoryExpenses[t.categoryId] = (categoryExpenses[t.categoryId] || 0) + Math.abs(t.amount);
-                    });
-                
-                const chartData = categories
-                    .filter(c => categoryExpenses[c.id] > 0)
-                    .map(c => ({
-                        name: c.name,
-                        amount: categoryExpenses[c.id],
-                        color: c.color
-                    }))
-                    .sort((a, b) => b.amount - a.amount);
-                
-                updateChart(chartData);
-                
-                // Predikció
-                const predictionDiv = document.getElementById('prediction-text');
-                if (!predictionDiv) return;
-                
-                if (monthlyTransactions.filter(t => t.amount < 0).length < 3) {
-                    predictionDiv.innerHTML = '📊 Még nincs elég adat a predikcióhoz.';
-                } else {
-                    const avgDailyExpense = expenses / daysElapsed;
-                    const predictedTotal = avgDailyExpense * daysInMonth;
-                    
-                    // Előző hónap összehasonlítás
-                    const prevMonth = now.getMonth() === 0 ? 12 : now.getMonth();
-                    const prevYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-                    const prevMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
-                    
-                    const prevMonthExpenses = transactions
-                        .filter(t => t.date.startsWith(prevMonthStr) && t.amount < 0)
-                        .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-                    
-                    let predictionHTML = `Ha így folytatod, hónap végéig kb. <strong>${formatCurrency(predictedTotal)}</strong>-t költesz.`;
-                    
-                    if (prevMonthExpenses > 0) {
-                        const diff = predictedTotal - prevMonthExpenses;
-                        const changeText = diff >= 0 ? 'több' : 'kevesebb';
-                        predictionHTML += `<br>Ez ${formatCurrency(Math.abs(diff))}-tel ${changeText}, mint az előző hónapban (${formatCurrency(prevMonthExpenses)}).`;
-                    }
-                    
-                    predictionDiv.innerHTML = predictionHTML;
-                }
-            } catch (error) {
-                console.error('Error loading dashboard:', error);
-            }
-        }
-
-        function updateChart(data) {
-            try {
-                const canvas = document.getElementById('categoryChart');
-                if (!canvas) return;
-                
-                const ctx = canvas.getContext('2d');
-                
-                if (chart) {
-                    chart.destroy();
-                }
-                
-                if (data.length === 0) {
-                    return;
-                }
-                
-                chart = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: data.map(d => d.name),
-                        datasets: [{
-                            data: data.map(d => d.amount),
-                            backgroundColor: data.map(d => d.color),
-                            borderWidth: 2,
-                            borderColor: '#fff'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: true,
-                        plugins: {
-                            legend: {
-                                position: 'bottom',
-                                labels: {
-                                    padding: 20,
-                                    usePointStyle: true
-                                }
-                            }
-                        }
-                    }
-                });
-            } catch (error) {
-                console.error('Error updating chart:', error);
-            }
-        }
-
-        // OCR funkcionalitás
-        async function processOCR() {
-            const fileInput = document.getElementById('ocr-file');
-            const file = fileInput.files[0];
-            if (!file) return;
-            
-            const status = document.getElementById('ocr-status');
-            const result = document.getElementById('ocr-result');
-            
-            status.innerHTML = '⏳ OCR folyamatban... (Ez eltarthat néhány másodpercig)';
-            result.innerHTML = '';
-            
-            try {
-                const worker = await Tesseract.recognize(file, 'hun+eng', {
-                    logger: m => {
-                        if (m.status === 'recognizing text') {
-                            status.innerHTML = `⏳ Szöveg felismerése... ${Math.round(m.progress * 100)}%`;
-                        }
-                    }
-                });
-                
-                const text = worker.data.text;
-                
-                // Összeg kinyerése
-                let amount = null;
-                const hufPattern = /(\d[\d\s]*)\s?(?:Ft|HUF)/i;
-                const eurPattern = /€\s?(\d+[.,]\d{2})/;
-                const usdPattern = /\$\s?(\d+[.,]\d{2})/;
-                
-                let match;
-                if (currentCurrency === 'HUF') {
-                    match = text.match(hufPattern);
-                    if (match) amount = parseFloat(match[1].replace(/\s/g, ''));
-                } else if (currentCurrency === 'EUR') {
-                    match = text.match(eurPattern);
-                    if (match) amount = parseFloat(match[1].replace(',', '.'));
-                } else if (currentCurrency === 'USD') {
-                    match = text.match(usdPattern);
-                    if (match) amount = parseFloat(match[1].replace(',', '.'));
-                }
-                
-                // Dátum kinyerése
-                let date = null;
-                const datePatterns = [
-                    /(\d{4}[-./]\d{2}[-./]\d{2})/,
-                    /(\d{2}[-./]\d{2}[-./]\d{4})/
-                ];
-                
-                for (const pattern of datePatterns) {
-                    const dateMatch = text.match(pattern);
-                    if (dateMatch) {
-                        date = dateMatch[1].replace(/\./g, '-');
-                        break;
-                    }
-                }
-                
-                if (amount || date) {
-                    let resultHTML = '<div style="margin-bottom: 16px;">';
-                    resultHTML += '<strong>✅ Felismert adatok:</strong><br>';
-                    if (amount) resultHTML += `Összeg: ${formatCurrency(amount)}<br>`;
-                    if (date) resultHTML += `Dátum: ${date}<br>`;
-                    resultHTML += '</div>';
-                    resultHTML += '<button class="btn btn-primary" onclick="prefillOCRForm(' + 
-                        (amount || 'null') + ', \'' + (date || '') + '\')">📝 Tranzakció létrehozása ezekkel az adatokkal</button>';
-                    
-                    result.innerHTML = resultHTML;
-                    status.innerHTML = '✅ OCR kész';
-                } else {
-                    status.innerHTML = '❌ Nem sikerült automatikusan felismerni, kérlek töltsd ki manuálisan';
-                    result.innerHTML = `
-                        <div class="ocr-result">${text}</div>
-                        <button class="btn btn-primary" onclick="navigateTo('transactions'); showTransactionForm();" style="margin-top: 16px;">
-                            📝 Manuális rögzítés
-                        </button>
-                    `;
-                }
-            } catch (error) {
-                status.innerHTML = '❌ Hiba az OCR feldolgozás során: ' + error.message;
-                console.error('OCR Error:', error);
-            }
-        }
-
-        function prefillOCRForm(amount, date) {
-            navigateTo('transactions');
-            setTimeout(() => {
-                showTransactionForm();
-                if (amount) {
-                    document.getElementById('trans-amount').value = amount;
-                    document.getElementById('trans-type').value = 'expense';
-                }
-                if (date) {
-                    document.getElementById('trans-date').value = date;
-                }
-                document.getElementById('trans-note').value = 'OCR-ból beolvasva';
-            }, 300);
-        }
-
-        // Alapértelmezett kategóriák inicializálása
-        async function initializeDefaultCategories() {
-            try {
-                const count = await db.categories.count();
-                console.log('Current category count:', count);
-                
-                if (count === 0) {
-                    console.log('Adding default categories...');
-                    await db.categories.bulkAdd(defaultCategories);
-                    console.log('Default categories added successfully');
-                }
-            } catch (error) {
-                console.error('Error initializing default categories:', error);
-            }
-        }
-
-        // Inicializálás
-        async function init() {
-            try {
-                console.log('Starting initialization...');
-                
-                // Service worker regisztrálása
-                if ('serviceWorker' in navigator) {
-                    try {
-                        const registration = await navigator.serviceWorker.register('/service-worker.js');
-                        console.log('Service Worker registered:', registration);
-                    } catch (error) {
-                        console.error('Service Worker registration failed:', error);
-                    }
-                }
-                
-                // Alapértelmezett kategóriák betöltése
-                await initializeDefaultCategories();
-                
-                // Beállítások betöltése
-                const currencySetting = await db.settings.get('currency');
-                if (currencySetting) {
-                    currentCurrency = currencySetting.value;
-                } else {
-                    await db.settings.put({ key: 'currency', value: 'HUF' });
-                }
-                
-                const select = document.getElementById('currency-select');
-                if (select) select.value = currentCurrency;
-                
-                // Kezdő oldal betöltése
-                await loadDashboard();
-                
-                console.log('Initialization complete');
-            } catch (error) {
-                console.error('Initialization error:', error);
-            }
-        }
-
-        // Alkalmazás indítása
-        document.addEventListener('DOMContentLoaded', () => {
-            init().catch(error => {
-                console.error('Failed to initialize app:', error);
+              }
             });
+          })
+          .catch(err => console.error('SW regisztrációs hiba:', err));
+
+        // Frissítés toast kattintás
+        document.getElementById('update-toast').addEventListener('click', () => {
+          if (newWorkerWaiting) {
+            newWorkerWaiting.postMessage({ type: 'SKIP_WAITING' });
+            document.getElementById('update-toast').classList.remove('show');
+            window.location.reload();
+          }
         });
-        
-        // Azonnali inicializálás ha a DOM már betöltődött
-        if (document.readyState === 'complete' || document.readyState === 'interactive') {
-            init().catch(error => {
-                console.error('Failed to initialize app:', error);
-            });
-        }
-    </script>
+
+        // Ha az SW skipWaiting-et hív, reload
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          console.log('SW controller változott — újratöltés');
+          window.location.reload();
+        });
+      });
+    }
+
+    // ===== Escape HTML segédfüggvény =====
+    function escapeHTML(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // ===== Inicializálás =====
+    async function init() {
+      await waitForDependencies();
+      await initDB();
+
+      // Pénznem beállítás
+      const setting = await db.settings.get('currency');
+      if (setting) {
+        currentCurrency = setting.value;
+        document.getElementById('screen-currency').classList.remove('active');
+        updateCurrencyWrappers();
+        await seedCategories();
+        switchScreen('dashboard');
+      } else {
+        // Pénznem választó aktív
+        document.getElementById('screen-currency').classList.add('active');
+        // A többi képernyő inaktív
+        document.querySelectorAll('#screen-dashboard, #screen-transactions, #screen-categories, #screen-savings, #screen-ocr').forEach(s => s.classList.remove('active'));
+      }
+
+      // Pénznem választó gombok
+      document.querySelectorAll('.currency-choice-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const currency = btn.dataset.currency;
+          await selectCurrency(currency);
+          await seedCategories();
+          refreshDashboard();
+          refreshCategoryList();
+        });
+      });
+
+      // Ellenőrizzük a standalone módot
+      checkStandalone();
+    }
+
+    init().catch(err => {
+      console.error('Inicializálási hiba:', err);
+      document.body.innerHTML = '<div style="padding:20px;text-align:center;"><h2>Hiba történt az alkalmazás betöltésekor.</h2><p>Kérlek frissítsd az oldalt, vagy próbáld másik böngészőben.</p><p style="font-size:0.8rem;color:#666;">' + err.message + '</p></div>';
+    });
+
+    console.log('💰 Budget Manager PWA — inicializálva');
+  </script>
 </body>
 </html>
