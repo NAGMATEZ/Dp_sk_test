@@ -1,7 +1,25 @@
-# Budget Manager PWA - Személyes költségvetés-kezelő
+# Budget Manager PWA
 
-## Lokális tesztelés
+Személyes költségvetés-kezelő Progressive Web App, amely teljesen offline működik.
 
-### Python HTTP szerverrel
+## Funkciók
+
+- 📊 Dashboard tortadiagrammal és predikciókkal
+- 💳 Tranzakciók kezelése (CRUD)
+- 📂 Kategóriák havi limitekkel
+- 🎯 Megtakarítási cél követése
+- 📸 OCR screenshot feldolgozás (Tesseract.js)
+- 📱 PWA - telepíthető telefonra, offline működés
+
+## Telepítés és futtatás
+
+### Lokális tesztelés
+
+Mivel a PWA service workert használ, nem működik `file://` protokollról. Használj egy egyszerű HTTP szervert:
+
 ```bash
-python3 -m http.server 8080
+# Python 3
+python -m http.server 8000
+
+# Node.js (ha telepítve van)
+npx serve .
